@@ -7,9 +7,9 @@ import (
 var mutex = &sync.Mutex{}
 
 func Lock() {
-	mutex.Lock()
+	//mutex.Lock()
 }
 
 func Unlock() {
-	mutex.Unlock()
+	//mutex.Unlock()
 }
