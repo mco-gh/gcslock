@@ -1,2 +1,2 @@
 # global-mutex
-Scalable mutex for serializing processes anywhere
+Scalable cloud resident mutex for serializing anything running anywhere.
