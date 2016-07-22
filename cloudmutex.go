@@ -1,13 +1,15 @@
 package cloudmutex
 
 import (
-	"fmt"
+	"sync"
 )
 
+var mutex = &sync.Mutex{}
+
 func Lock() {
-	fmt.Println("locked")
+	mutex.Lock()
 }
 
 func Unlock() {
-	fmt.Println("unlocked")
+	mutex.Unlock()
 }
