@@ -1,2 +1,2 @@
-# cloud-mutex
+# cloudmutex
 Scalable cloud resident mutex for serializing anything running anywhere.
