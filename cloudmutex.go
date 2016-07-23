@@ -32,11 +32,11 @@ type globalmutex struct {
 }
 
 func (m localmutex) Lock() {
-	m.Lock()
+	m.mutex.Lock()
 }
 
 func (m localmutex) Unlock() {
-	m.Unlock()
+	m.mutex.Unlock()
 }
 
 func (m globalmutex) Lock() {
