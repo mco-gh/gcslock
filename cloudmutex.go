@@ -6,16 +6,13 @@ import (
 	"golang.org/x/oauth2/google"
 	storage "google.golang.org/api/storage/v1"
 	"log"
-	"os"
 	"sync"
+	//"os"
 )
 
 const (
-	fileName   = "file"
-	objectName = "object"
-	scope      = storage.DevstorageFullControlScope
-	projectID  = "id"
-	bucketName = "bucket"
+	//fileName   = "file"
+	scope = storage.DevstorageFullControlScope
 )
 
 type cloudmutex interface {
@@ -28,6 +25,9 @@ type localmutex struct {
 }
 
 type globalmutex struct {
+	project string
+	bucket  string
+	object  string
 	service *storage.Service
 }
 
@@ -40,29 +40,39 @@ func (m localmutex) Unlock() {
 }
 
 func (m globalmutex) Lock() {
-	object := &storage.Object{Name: objectName}
-	file, err := os.Open(fileName)
-	if err != nil {
-		log.Fatalf("Error opening %q: %v", fileName, err)
-	}
-	if _, err := m.service.Objects.Insert(bucketName, object).Media(file).Do(); err != nil {
+	object := &storage.Object{Name: m.object}
+	//file, err := os.Open(fileName)
+	//if err != nil {
+	//log.Fatalf("Error opening %q: %v", fileName, err)
+	//}
+	//if _, err := m.service.Objects.Insert(m.bucket, m.object).Media(file).Do(); err != nil {
+	if _, err := m.service.Objects.Insert(m.bucket, object).Do(); err != nil {
 		log.Fatalf("Objects.Insert failed: %v", err)
 	}
 }
 
 func (m globalmutex) Unlock() {
-	if err := m.service.Objects.Delete(bucketName, objectName).Do(); err != nil {
+	if err := m.service.Objects.Delete(m.bucket, m.object).Do(); err != nil {
 		log.Fatalf("Could not delete object: %v\n", err)
 	}
 }
 
-func newMutex(scope string) (cloudmutex, error) {
+func newMutex(scope, project, bucket, object string) (cloudmutex, error) {
 	if scope == "local" {
 		p := new(localmutex)
 		p.mutex = &sync.Mutex{}
 		return p, nil
 	} else if scope == "" || scope == "global" {
 		p := new(globalmutex)
+		if p.project != "" {
+			p.project = project
+		}
+		if p.bucket != "" {
+			p.bucket = bucket
+		}
+		if p.object != "" {
+			p.object = object
+		}
 		client, err := google.DefaultClient(context.Background(), scope)
 		if err != nil {
 			log.Fatalf("Unable to get default client: %v", err)
