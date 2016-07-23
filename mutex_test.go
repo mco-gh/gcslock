@@ -24,13 +24,25 @@ func locker(done chan bool, t *testing.T, i int, m cloudmutex) {
 	done <- true
 }
 
-func TestParallel(t *testing.T) {
-	//m, err := newMutex("local")
-	m, err := newMutex("global", "marc-general", "cloudmutex", "lock", "foo")
+func TestParallelLocal(t *testing.T) {
+	m, err := newMutex("local", "", "", "")
 	if err != nil {
-		t.Errorf("unable to allocate a cloudmutex object")
+		t.Errorf("unable to allocate a cloudmutex local object")
 		return
 	}
+	runParallelTest(t, m)
+}
+
+func TestParallelGlobal(t *testing.T) {
+	m, err := newMutex("global", "marc-general", "cloudmutex", "lock")
+	if err != nil {
+		t.Errorf("unable to allocate a cloudmutex global object")
+		return
+	}
+	runParallelTest(t, m)
+}
+
+func runParallelTest(t *testing.T, m cloudmutex) {
 	done := make(chan bool, 1)
 	total := 0
 	for i := 0; i < limit; i++ {
