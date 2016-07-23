@@ -6,7 +6,7 @@ import (
 )
 
 var (
-	limit        = 100
+	limit        = 1
 	lock_held_by = -1
 )
 
@@ -25,7 +25,8 @@ func locker(done chan bool, t *testing.T, i int, m cloudmutex) {
 }
 
 func TestParallel(t *testing.T) {
-	m, err := newMutex("local")
+	//m, err := newMutex("local")
+	m, err := newMutex("global", "marc-general", "cloudmutex", "lock", "foo")
 	if err != nil {
 		t.Errorf("unable to allocate a cloudmutex object")
 		return
