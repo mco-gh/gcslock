@@ -1,6 +1,7 @@
 package cloudmutex
 
 import (
+	"sync"
 	"testing"
 	"time"
 )
@@ -10,7 +11,7 @@ var (
 	lock_held_by = -1
 )
 
-func locker(done chan bool, t *testing.T, i int, m cloudmutex) {
+func locker(done chan bool, t *testing.T, i int, m sync.Locker) {
 	m.Lock()
 	if lock_held_by != -1 {
 		t.Errorf("%d trying to lock, but already held by %d",
@@ -25,16 +26,12 @@ func locker(done chan bool, t *testing.T, i int, m cloudmutex) {
 }
 
 func TestParallelLocal(t *testing.T) {
-	m, err := newMutex("local", "", "", "")
-	if err != nil {
-		t.Errorf("unable to allocate a cloudmutex local object")
-		return
-	}
+	m := &sync.Mutex{}
 	runParallelTest(t, m)
 }
 
 func TestParallelGlobal(t *testing.T) {
-	m, err := newMutex("global", "marc-general", "cloudmutex", "lock")
+	m, err := newCloudMutex("marc-general", "cloudmutex", "lock")
 	if err != nil {
 		t.Errorf("unable to allocate a cloudmutex global object")
 		return
@@ -42,7 +39,7 @@ func TestParallelGlobal(t *testing.T) {
 	runParallelTest(t, m)
 }
 
-func runParallelTest(t *testing.T, m cloudmutex) {
+func runParallelTest(t *testing.T, m sync.Locker) {
 	done := make(chan bool, 1)
 	total := 0
 	for i := 0; i < limit; i++ {
