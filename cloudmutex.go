@@ -3,7 +3,6 @@ package cloudmutex
 import (
 	"bytes"
 	"errors"
-	//"fmt"
 	"golang.org/x/net/context"
 	"golang.org/x/oauth2/google"
 	storage "google.golang.org/api/storage/v1"
@@ -48,21 +47,18 @@ func Unlock(l sync.Locker, d time.Duration) error {
 	}
 }
 
-// Lock (the method, not the package function above) will wait indefinitely
-// to acquire a global mutex lock.
+// Lock method waits indefinitely to acquire a global mutex lock.
 func (m cloudmutex) Lock() {
 	object := &storage.Object{Name: m.object}
 	for {
 		_, err := m.service.Objects.Insert(m.bucket, object).Media(bytes.NewReader([]byte("1"))).Do()
-		//fmt.Printf("res: %v", res)
 		if err == nil {
 			return
 		}
 	}
 }
 
-// Unlock (the method, not the package function above) will wait indefinitely
-// to relinquisha a global mutex lock.
+// Unlock method waits indefinitely to relinquish a global mutex lock.
 func (m cloudmutex) Unlock() {
 	for {
 		err := m.service.Objects.Delete(m.bucket, m.object).Do()
