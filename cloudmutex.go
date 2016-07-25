@@ -47,7 +47,7 @@ func Unlock(l sync.Locker, d time.Duration) error {
 	}
 }
 
-// Lock method waits indefinitely to acquire a global mutex lock.
+// The Lock method waits indefinitely to acquire a global mutex lock.
 func (m cloudmutex) Lock() {
 	object := &storage.Object{Name: m.object}
 	for {
@@ -58,7 +58,7 @@ func (m cloudmutex) Lock() {
 	}
 }
 
-// Unlock method waits indefinitely to relinquish a global mutex lock.
+// The Unlock method waits indefinitely to relinquish a global mutex lock.
 func (m cloudmutex) Unlock() {
 	for {
 		err := m.service.Objects.Delete(m.bucket, m.object).Do()
