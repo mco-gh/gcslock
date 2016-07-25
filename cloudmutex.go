@@ -3,6 +3,7 @@ package cloudmutex
 import (
 	"bytes"
 	"errors"
+	//"fmt"
 	"golang.org/x/net/context"
 	"golang.org/x/oauth2/google"
 	storage "google.golang.org/api/storage/v1"
@@ -17,8 +18,8 @@ type cloudmutex struct {
 	service *storage.Service
 }
 
-// TimedLock will wait up to duruation d for l.Lock() to succeed.
-func TimedLock(l sync.Locker, d time.Duration) error {
+// Lock will wait up to duruation d for l.Lock() to succeed.
+func Lock(l sync.Locker, d time.Duration) error {
 	done := make(chan bool, 1)
 	go func() {
 		l.Lock()
@@ -32,8 +33,8 @@ func TimedLock(l sync.Locker, d time.Duration) error {
 	}
 }
 
-// TimedUnlock will wait up to duruation d for l.Unlock() to succeed.
-func TimedUnlock(l sync.Locker, d time.Duration) error {
+// Unlock will wait up to duruation d for l.Unlock() to succeed.
+func Unlock(l sync.Locker, d time.Duration) error {
 	done := make(chan bool, 1)
 	go func() {
 		l.Unlock()
@@ -47,16 +48,21 @@ func TimedUnlock(l sync.Locker, d time.Duration) error {
 	}
 }
 
+// Lock (the method, not the package function above) will wait indefinitely
+// to acquire a global mutex lock.
 func (m cloudmutex) Lock() {
 	object := &storage.Object{Name: m.object}
 	for {
 		_, err := m.service.Objects.Insert(m.bucket, object).Media(bytes.NewReader([]byte("1"))).Do()
+		//fmt.Printf("res: %v", res)
 		if err == nil {
 			return
 		}
 	}
 }
 
+// Unlock (the method, not the package function above) will wait indefinitely
+// to relinquisha a global mutex lock.
 func (m cloudmutex) Unlock() {
 	for {
 		err := m.service.Objects.Delete(m.bucket, m.object).Do()
