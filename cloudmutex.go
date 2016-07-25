@@ -20,10 +20,10 @@ type cloudmutex struct {
 
 // Lock will wait up to duruation d for l.Lock() to succeed.
 func Lock(l sync.Locker, d time.Duration) error {
-	done := make(chan bool, 1)
+	done := make(chan struct{}, 1)
 	go func() {
 		l.Lock()
-		done <- true
+		done <- struct{}{}
 	}()
 	select {
 	case <-done:
@@ -35,10 +35,10 @@ func Lock(l sync.Locker, d time.Duration) error {
 
 // Unlock will wait up to duruation d for l.Unlock() to succeed.
 func Unlock(l sync.Locker, d time.Duration) error {
-	done := make(chan bool, 1)
+	done := make(chan struct{}, 1)
 	go func() {
 		l.Unlock()
-		done <- true
+		done <- struct{}{}
 	}()
 	select {
 	case <-done:
