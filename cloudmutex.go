@@ -19,40 +19,30 @@ type cloudmutex struct {
 
 // TimedLock will wait up to duruation d for l.Lock() to succeed.
 func TimedLock(l sync.Locker, d time.Duration) error {
-	timeout := make(chan bool, 1)
-	go func() {
-		time.Sleep(d)
-		timeout <- true
-	}()
-	done := make(chan bool, 1)
+	done := make(chan struct{}, 1)
 	go func() {
 		l.Lock()
-		done <- true
+		done <- struct{}{}
 	}()
 	select {
 	case <-done:
 		return nil
-	case <-timeout:
+	case <-time.After(d):
 		return errors.New("lock request timed out")
 	}
 }
 
 // TimedUnlock will wait up to duruation d for l.Unlock() to succeed.
 func TimedUnlock(l sync.Locker, d time.Duration) error {
-	timeout := make(chan bool, 1)
-	go func() {
-		time.Sleep(d)
-		timeout <- true
-	}()
-	done := make(chan bool, 1)
+	done := make(chan struct{}, 1)
 	go func() {
 		l.Unlock()
-		done <- true
+		done <- struct{}{}
 	}()
 	select {
 	case <-done:
 		return nil
-	case <-timeout:
+	case <-time.After(d):
 		return errors.New("unlock request timed out")
 	}
 }
