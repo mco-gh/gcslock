@@ -1,15 +1,13 @@
 package cloudmutex
 
 import (
+	"bytes"
+	"errors"
 	"golang.org/x/net/context"
 	"golang.org/x/oauth2/google"
 	storage "google.golang.org/api/storage/v1"
-	"log"
-	"os"
-)
-
-const (
-	scope = storage.DevstorageFullControlScope
+	"sync"
+	"time"
 )
 
 type cloudmutex struct {
@@ -19,43 +17,90 @@ type cloudmutex struct {
 	service *storage.Service
 }
 
+// TimedLock will wait up to duruation d for l.Lock() to succeed.
+func TimedLock(l sync.Locker, d time.Duration) error {
+	timeout := make(chan bool, 1)
+	go func() {
+		time.Sleep(d)
+		timeout <- true
+	}()
+	done := make(chan bool, 1)
+	go func() {
+		l.Lock()
+		done <- true
+	}()
+	select {
+	case <-done:
+		return nil
+	case <-timeout:
+		return errors.New("lock request timed out")
+	}
+}
+
+// TimedUnlock will wait up to duruation d for l.Unlock() to succeed.
+func TimedUnlock(l sync.Locker, d time.Duration) error {
+	timeout := make(chan bool, 1)
+	go func() {
+		time.Sleep(d)
+		timeout <- true
+	}()
+	done := make(chan bool, 1)
+	go func() {
+		l.Unlock()
+		done <- true
+	}()
+	select {
+	case <-done:
+		return nil
+	case <-timeout:
+		return errors.New("unlock request timed out")
+	}
+}
+
 func (m cloudmutex) Lock() {
 	object := &storage.Object{Name: m.object}
-	file, err := os.Open("/dev/null")
-	if err != nil {
-		log.Fatalf("Error opening /dev/null: %v", err)
-		return
-	}
-	if _, err := m.service.Objects.Insert(m.bucket, object).Media(file).Do(); err != nil {
-		log.Fatalf("Objects.Insert failed: %v", err)
+	for {
+		_, err := m.service.Objects.Insert(m.bucket, object).Media(bytes.NewReader([]byte("1"))).Do()
+		if err == nil {
+			return
+		}
 	}
 }
 
 func (m cloudmutex) Unlock() {
-	if err := m.service.Objects.Delete(m.bucket, m.object).Do(); err != nil {
-		log.Fatalf("Could not delete object: %v\n", err)
+	for {
+		err := m.service.Objects.Delete(m.bucket, m.object).Do()
+		if err == nil {
+			return
+		}
 	}
 }
 
-func newCloudMutex(project, bucket, object string) (*cloudmutex, error) {
-	p := new(cloudmutex)
-	if project != "" {
-		p.project = project
+// New creates a GCS-based sync.Locker.
+// It uses Application Default Credentials to make authenticated requests
+// to Google Cloud Storage. See the DefaultClient function of the
+// golang.org/x/oauth2/google package for App Default Credentials details.
+//
+// If ctx argument is nil, context.Background is used.
+//
+func New(ctx context.Context, project, bucket, object string) (sync.Locker, error) {
+	if ctx == nil {
+		ctx = context.Background()
 	}
-	if bucket != "" {
-		p.bucket = bucket
-	}
-	if object != "" {
-		p.object = object
-	}
-	client, err := google.DefaultClient(context.Background(), scope)
+	scope := storage.DevstorageFullControlScope
+	client, err := google.DefaultClient(ctx, scope)
 	if err != nil {
-		log.Fatalf("Unable to get default client: %v", err)
+		return nil, err
 	}
 	service, err := storage.New(client)
 	if err != nil {
-		log.Fatalf("Unable to create storage service: %v", err)
+		return nil, err
 	}
-	p.service = service
-	return p, nil
+	m := &cloudmutex{
+		project: project,
+		bucket:  bucket,
+		object:  object,
+		service: service,
+	}
+	return m, nil
 }

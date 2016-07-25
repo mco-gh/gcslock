@@ -6,6 +6,12 @@ import (
 	"time"
 )
 
+const (
+	PROJECT = "marc-general"
+	BUCKET  = "cloudmutex"
+	OBJECT  = "lock"
+)
+
 var (
 	limit        = 1
 	lock_held_by = -1
@@ -31,7 +37,7 @@ func TestParallelLocal(t *testing.T) {
 }
 
 func TestParallelGlobal(t *testing.T) {
-	m, err := newCloudMutex("marc-general", "cloudmutex", "lock")
+	m, err := New(nil, PROJECT, BUCKET, OBJECT)
 	if err != nil {
 		t.Errorf("unable to allocate a cloudmutex global object")
 		return
@@ -49,4 +55,22 @@ func runParallelTest(t *testing.T, m sync.Locker) {
 	for ; total > 0; total-- {
 		<-done
 	}
+}
+
+func TestLockTimeout(t *testing.T) {
+	m, err := New(nil, PROJECT, BUCKET, OBJECT)
+	if err != nil {
+		t.Errorf("unable to allocate a cloudmutex global object")
+		return
+	}
+	TimedLock(m, 3*time.Second)
+}
+
+func TestUnlockTimeout(t *testing.T) {
+	m, err := New(nil, PROJECT, BUCKET, OBJECT)
+	if err != nil {
+		t.Errorf("unable to allocate a cloudmutex global object")
+		return
+	}
+	TimedUnlock(m, 3*time.Second)
 }
