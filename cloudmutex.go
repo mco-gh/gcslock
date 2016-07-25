@@ -3,7 +3,6 @@ package cloudmutex
 import (
 	"bytes"
 	"errors"
-	//"fmt"
 	"golang.org/x/net/context"
 	"golang.org/x/oauth2/google"
 	storage "google.golang.org/api/storage/v1"
@@ -20,10 +19,10 @@ type cloudmutex struct {
 
 // Lock will wait up to duruation d for l.Lock() to succeed.
 func Lock(l sync.Locker, d time.Duration) error {
-	done := make(chan bool, 1)
+	done := make(chan struct{}, 1)
 	go func() {
 		l.Lock()
-		done <- true
+		done <- struct{}{}
 	}()
 	select {
 	case <-done:
@@ -35,10 +34,10 @@ func Lock(l sync.Locker, d time.Duration) error {
 
 // Unlock will wait up to duruation d for l.Unlock() to succeed.
 func Unlock(l sync.Locker, d time.Duration) error {
-	done := make(chan bool, 1)
+	done := make(chan struct{}, 1)
 	go func() {
 		l.Unlock()
-		done <- true
+		done <- struct{}{}
 	}()
 	select {
 	case <-done:
@@ -54,7 +53,6 @@ func (m cloudmutex) Lock() {
 	object := &storage.Object{Name: m.object}
 	for {
 		_, err := m.service.Objects.Insert(m.bucket, object).Media(bytes.NewReader([]byte("1"))).Do()
-		//fmt.Printf("res: %v", res)
 		if err == nil {
 			return
 		}

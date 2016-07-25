@@ -29,7 +29,7 @@ func locker(done chan struct{}, t *testing.T, i int, m sync.Locker) {
 	local_mutex.Unlock()
 	t.Logf("locked by %d", i)
 	time.Sleep(10 * time.Millisecond)
-	//m.Unlock()
+	m.Unlock()
 	local_mutex.Lock()
 	lock_held_by = -1
 	local_mutex.Unlock()
