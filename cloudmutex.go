@@ -61,8 +61,11 @@ func (m cloudmutex) Lock() {
 		m.bucket, q.Encode())
 	for {
 		res, err := m.client.Post(url, "plain/text", bytes.NewReader([]byte("1")))
-		if err == nil && res.StatusCode == 200 {
-			defer res.Body.Close()
+		if err != nil {
+			continue
+		}
+		res.Body.Close()
+		if res.StatusCode == 200 {
 			return
 		}
 	}
@@ -72,11 +75,17 @@ func (m cloudmutex) Lock() {
 func (m cloudmutex) Unlock() {
 	url := "https://www.googleapis.com/storage/v1/b/" + m.bucket + "/o/" + m.object
 	for {
-		req, err := http.NewRequest("DELETE", url, nil)
-		if err == nil {
+		for {
+			req, err := http.NewRequest("DELETE", url, nil)
+			if err != nil {
+				continue
+			}
 			res, err := m.client.Do(req)
-			if err == nil && res.StatusCode == 204 {
-				defer res.Body.Close()
+			if err != nil {
+				continue
+			}
+			res.Body.Close()
+			if res.StatusCode == 204 {
 				return
 			}
 		}
