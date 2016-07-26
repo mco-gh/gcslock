@@ -30,10 +30,10 @@ func locker(done chan struct{}, t *testing.T, i int, m sync.Locker) {
 	lockHolderMu.Unlock()
 	t.Logf("locked by %d", i)
 	time.Sleep(10 * time.Millisecond)
-	m.Unlock()
 	lockHolderMu.Lock()
 	lockHolder = -1
 	lockHolderMu.Unlock()
+	m.Unlock()
 	done <- struct{}{}
 }
 
