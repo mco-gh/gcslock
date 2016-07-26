@@ -13,8 +13,9 @@ const (
 )
 
 var (
-	limit        = 10
-	lockHolderMu = &sync.Mutex{}
+	limit = 10
+
+	lockHolderMu sync.Mutex
 	lockHolder   = -1
 )
 
