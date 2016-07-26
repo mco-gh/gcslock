@@ -7,39 +7,37 @@ import (
 )
 
 const (
-	PROJECT = "marc-general"
-	BUCKET  = "cloudmutex"
-	OBJECT  = "lock"
+	project = "marc-general"
+	bucket  = "cloudmutex"
+	object  = "lock"
 )
 
 var (
-	limit      = 10
-	lockHolder = -1
+	limit        = 10
+	lockHolderMu = &sync.Mutex{}
+	lockHolder   = -1
 )
 
-func locker(done chan struct{}, t *testing.T, i int, m sync.Locker,
-	lockHolderMutex sync.Locker) {
+func locker(done chan struct{}, t *testing.T, i int, m sync.Locker) {
 	m.Lock()
-	lockHolderMutex.Lock()
+	lockHolderMu.Lock()
 	if lockHolder != -1 {
 		t.Errorf("%d trying to lock, but already held by %d",
 			i, lockHolder)
 	}
 	lockHolder = i
-	lockHolderMutex.Unlock()
+	lockHolderMu.Unlock()
 	t.Logf("locked by %d", i)
 	time.Sleep(10 * time.Millisecond)
 	m.Unlock()
-	lockHolderMutex.Lock()
+	lockHolderMu.Lock()
 	lockHolder = -1
-	lockHolderMutex.Unlock()
+	lockHolderMu.Unlock()
 	done <- struct{}{}
 }
 
 func TestParallel(t *testing.T) {
-	lockHolderMutex := &sync.Mutex{}
-	lockHolder = -1
-	m, err := New(nil, PROJECT, BUCKET, OBJECT)
+	m, err := New(nil, project, bucket, object)
 	if err != nil {
 		t.Errorf("unable to allocate a cloudmutex global object")
 		return
@@ -48,7 +46,7 @@ func TestParallel(t *testing.T) {
 	total := 0
 	for i := 0; i < limit; i++ {
 		total++
-		go locker(done, t, i, m, lockHolderMutex)
+		go locker(done, t, i, m)
 	}
 	for ; total > 0; total-- {
 		<-done
@@ -57,7 +55,7 @@ func TestParallel(t *testing.T) {
 
 /* TODO: add testing for timed lock (both success and timeout cases)
 func TestLockTimeout(t *testing.T) {
-	m, err := New(nil, PROJECT, BUCKET, OBJECT)
+	m, err := New(nil, project, bucket, object)
 	if err != nil {
 		t.Errorf("unable to allocate a cloudmutex global object")
 		return
@@ -68,7 +66,7 @@ func TestLockTimeout(t *testing.T) {
 
 /* TODO: add testing for timed unlock (both success and timeout cases)
 func TestUnlockTimeout(t *testing.T) {
-	m, err := New(nil, PROJECT, BUCKET, OBJECT)
+	m, err := New(nil, project, bucket, object)
 	if err != nil {
 		t.Errorf("unable to allocate a cloudmutex global object")
 		return

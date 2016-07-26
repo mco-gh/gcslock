@@ -3,10 +3,12 @@ package cloudmutex
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"golang.org/x/net/context"
 	"golang.org/x/oauth2/google"
 	storage "google.golang.org/api/storage/v1"
 	"net/http"
+	"net/url"
 	"sync"
 	"time"
 )
@@ -50,16 +52,18 @@ func Unlock(l sync.Locker, d time.Duration) error {
 
 // Lock waits indefinitely to acquire a global mutex lock.
 func (m cloudmutex) Lock() {
-	url := "https://www.googleapis.com/upload/storage/v1/b/" +
-		m.bucket + "/o?uploadType=media&name=" + m.object + "&ifGenerationMatch=0"
+	q := url.Values{
+		"name":              {m.object},
+		"uploadType":        {"media"},
+		"ifGenerationMatch": {"0"},
+	}
+	url := fmt.Sprintf("https://www.googleapis.com/upload/storage/v1/b/%s/o?%s",
+		m.bucket, q.Encode())
 	for {
-		req, err := http.NewRequest("POST", url, bytes.NewBuffer([]byte("1")))
-		if err == nil {
-			resp, err := m.client.Do(req)
-			defer resp.Body.Close()
-			if err == nil && resp.StatusCode == 200 {
-				return
-			}
+		res, err := m.client.Post(url, "plain/text", bytes.NewReader([]byte("1")))
+		defer res.Body.Close()
+		if err == nil && res.StatusCode == 200 {
+			return
 		}
 	}
 }
