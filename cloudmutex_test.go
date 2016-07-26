@@ -13,12 +13,12 @@ const (
 )
 
 var (
-	limit      = 1
+	limit      = 10
 	lockHolder = -1
 )
 
-func locker(done chan struct{}, t *testing.T, i int, m sync.Locker) {
-	var lockHolderMutex sync.Mutex
+func locker(done chan struct{}, t *testing.T, i int, m sync.Locker,
+	lockHolderMutex sync.Locker) {
 	m.Lock()
 	lockHolderMutex.Lock()
 	if lockHolder != -1 {
@@ -37,20 +37,18 @@ func locker(done chan struct{}, t *testing.T, i int, m sync.Locker) {
 }
 
 func TestParallel(t *testing.T) {
+	lockHolderMutex := &sync.Mutex{}
+	lockHolder = -1
 	m, err := New(nil, PROJECT, BUCKET, OBJECT)
 	if err != nil {
 		t.Errorf("unable to allocate a cloudmutex global object")
 		return
 	}
-	runParallelTest(t, m)
-}
-
-func runParallelTest(t *testing.T, m sync.Locker) {
 	done := make(chan struct{}, 1)
 	total := 0
 	for i := 0; i < limit; i++ {
 		total++
-		go locker(done, t, i, m)
+		go locker(done, t, i, m, lockHolderMutex)
 	}
 	for ; total > 0; total-- {
 		<-done
