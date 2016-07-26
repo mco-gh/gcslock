@@ -61,8 +61,8 @@ func (m cloudmutex) Lock() {
 		m.bucket, q.Encode())
 	for {
 		res, err := m.client.Post(url, "plain/text", bytes.NewReader([]byte("1")))
-		defer res.Body.Close()
 		if err == nil && res.StatusCode == 200 {
+			defer res.Body.Close()
 			return
 		}
 	}
@@ -75,8 +75,8 @@ func (m cloudmutex) Unlock() {
 		req, err := http.NewRequest("DELETE", url, nil)
 		if err == nil {
 			resp, err := m.client.Do(req)
-			defer resp.Body.Close()
 			if err == nil {
+				defer resp.Body.Close()
 				return
 			}
 		}
