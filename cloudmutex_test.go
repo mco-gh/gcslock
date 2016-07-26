@@ -13,12 +13,11 @@ const (
 )
 
 var (
-	limit        = 1
+	limit        = 10
 	lock_held_by = -1
 )
 
-func locker(done chan struct{}, t *testing.T, i int, m sync.Locker) {
-	local_mutex := &sync.Mutex{}
+func locker(done chan struct{}, t *testing.T, i int, m sync.Locker, local_mutex sync.Locker) {
 	m.Lock()
 	local_mutex.Lock()
 	if lock_held_by != -1 {
@@ -46,11 +45,12 @@ func TestParallel(t *testing.T) {
 }
 
 func runParallelTest(t *testing.T, m sync.Locker) {
+	local_mutex := &sync.Mutex{}
 	done := make(chan struct{}, 1)
 	total := 0
 	for i := 0; i < limit; i++ {
 		total++
-		go locker(done, t, i, m)
+		go locker(done, t, i, m, local_mutex)
 	}
 	for ; total > 0; total-- {
 		<-done
