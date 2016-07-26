@@ -17,7 +17,7 @@ type cloudmutex struct {
 	service *storage.Service
 }
 
-// Lock will wait up to duruation d for l.Lock() to succeed.
+// Lock waits up to duruation d for l.Lock() to succeed.
 func Lock(l sync.Locker, d time.Duration) error {
 	done := make(chan struct{}, 1)
 	go func() {
@@ -32,7 +32,7 @@ func Lock(l sync.Locker, d time.Duration) error {
 	}
 }
 
-// Unlock will wait up to duruation d for l.Unlock() to succeed.
+// Unlock waits up to duruation d for l.Unlock() to succeed.
 func Unlock(l sync.Locker, d time.Duration) error {
 	done := make(chan struct{}, 1)
 	go func() {
@@ -47,7 +47,7 @@ func Unlock(l sync.Locker, d time.Duration) error {
 	}
 }
 
-// The Lock method waits indefinitely to acquire a global mutex lock.
+// Lock waits indefinitely to acquire a global mutex lock.
 func (m cloudmutex) Lock() {
 	object := &storage.Object{Name: m.object}
 	for {
@@ -58,7 +58,7 @@ func (m cloudmutex) Lock() {
 	}
 }
 
-// The Unlock method waits indefinitely to relinquish a global mutex lock.
+// Unlock waits indefinitely to relinquish a global mutex lock.
 func (m cloudmutex) Unlock() {
 	for {
 		err := m.service.Objects.Delete(m.bucket, m.object).Do()

@@ -13,26 +13,26 @@ const (
 )
 
 var (
-	limit        = 1
-	lock_held_by = -1
+	limit      = 1
+	lockHolder = -1
 )
 
 func locker(done chan struct{}, t *testing.T, i int, m sync.Locker) {
-	local_mutex := &sync.Mutex{}
+	var lockHolderMutex sync.Mutex
 	m.Lock()
-	local_mutex.Lock()
-	if lock_held_by != -1 {
+	lockHolderMutex.Lock()
+	if lockHolder != -1 {
 		t.Errorf("%d trying to lock, but already held by %d",
-			i, lock_held_by)
+			i, lockHolder)
 	}
-	lock_held_by = i
-	local_mutex.Unlock()
+	lockHolder = i
+	lockHolderMutex.Unlock()
 	t.Logf("locked by %d", i)
 	time.Sleep(10 * time.Millisecond)
 	m.Unlock()
-	local_mutex.Lock()
-	lock_held_by = -1
-	local_mutex.Unlock()
+	lockHolderMutex.Lock()
+	lockHolder = -1
+	lockHolderMutex.Unlock()
 	done <- struct{}{}
 }
 
