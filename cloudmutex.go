@@ -74,9 +74,9 @@ func (m cloudmutex) Unlock() {
 	for {
 		req, err := http.NewRequest("DELETE", url, nil)
 		if err == nil {
-			resp, err := m.client.Do(req)
-			if err == nil {
-				defer resp.Body.Close()
+			res, err := m.client.Do(req)
+			if err == nil && res.StatusCode == 204 {
+				defer res.Body.Close()
 				return
 			}
 		}
