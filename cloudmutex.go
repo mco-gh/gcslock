@@ -3,9 +3,12 @@ package cloudmutex
 import (
 	"bytes"
 	"errors"
+	// TODO: remove fmt use when done debugging
+	"fmt"
 	"golang.org/x/net/context"
 	"golang.org/x/oauth2/google"
 	storage "google.golang.org/api/storage/v1"
+	"net/http"
 	"sync"
 	"time"
 )
@@ -14,11 +17,11 @@ type cloudmutex struct {
 	project string
 	bucket  string
 	object  string
-	service *storage.Service
+	client  *http.Client
 }
 
-// TimedLock will wait up to duruation d for l.Lock() to succeed.
-func TimedLock(l sync.Locker, d time.Duration) error {
+// Lock will wait up to duruation d for l.Lock() to succeed.
+func Lock(l sync.Locker, d time.Duration) error {
 	done := make(chan struct{}, 1)
 	go func() {
 		l.Lock()
@@ -32,8 +35,8 @@ func TimedLock(l sync.Locker, d time.Duration) error {
 	}
 }
 
-// TimedUnlock will wait up to duruation d for l.Unlock() to succeed.
-func TimedUnlock(l sync.Locker, d time.Duration) error {
+// Unlock will wait up to duruation d for l.Unlock() to succeed.
+func Unlock(l sync.Locker, d time.Duration) error {
 	done := make(chan struct{}, 1)
 	go func() {
 		l.Unlock()
@@ -47,20 +50,31 @@ func TimedUnlock(l sync.Locker, d time.Duration) error {
 	}
 }
 
+// The Lock method waits indefinitely to acquire a global mutex lock.
 func (m cloudmutex) Lock() {
-	object := &storage.Object{Name: m.object}
+	url := "https://www.googleapis.com/upload/storage/v1/b/" +
+		m.bucket + "/o?uploadType=media&name=" + m.object + "&ifGenerationMatch=0"
 	for {
-		_, err := m.service.Objects.Insert(m.bucket, object).Media(bytes.NewReader([]byte("1"))).Do()
-		if err == nil {
+		req, _ := http.NewRequest("POST", url, bytes.NewBuffer([]byte("1")))
+		resp, err := m.client.Do(req)
+		fmt.Printf("resp:%v, err:%v\n", resp.StatusCode, err)
+		if err == nil && resp.StatusCode == 200 {
+			resp.Body.Close()
 			return
 		}
 	}
 }
 
+// The Unlock method waits indefinitely to relinquish a global mutex lock.
 func (m cloudmutex) Unlock() {
+	url := "https://www.googleapis.com/storage/v1/b/" +
+		m.bucket + "/o/" + m.object
 	for {
-		err := m.service.Objects.Delete(m.bucket, m.object).Do()
+		req, _ := http.NewRequest("DELETE", url, nil)
+		resp, err := m.client.Do(req)
+		fmt.Printf("resp:%v, err:%v\n", resp.StatusCode, err)
 		if err == nil {
+			resp.Body.Close()
 			return
 		}
 	}
@@ -82,15 +96,11 @@ func New(ctx context.Context, project, bucket, object string) (sync.Locker, erro
 	if err != nil {
 		return nil, err
 	}
-	service, err := storage.New(client)
-	if err != nil {
-		return nil, err
-	}
 	m := &cloudmutex{
 		project: project,
 		bucket:  bucket,
 		object:  object,
-		service: service,
+		client:  client,
 	}
 	return m, nil
 }
