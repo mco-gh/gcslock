@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"reflect"
 	"sync"
 	"testing"
 	"time"
@@ -30,28 +31,23 @@ func TestLock(t *testing.T) {
 		}
 		path := "/b/cloudmutex/o"
 		if r.URL.Path != path {
-			t.Errorf("r.Path = %q; want %q", r.URL.Path, path)
+			t.Errorf("r.URL.Path = %q; want %q", r.URL.Path, path)
 		}
 		vals := url.Values{
 			"ifGenerationMatch": []string{"0"},
 			"name":              []string{"lock"},
 			"uploadType":        []string{"media"},
 		}
-		params := r.URL.Query()
-		for k, v := range vals {
-			if v[0] != params[k][0] {
-				t.Errorf("query param %q = %q; want %q", k, params[k][0], v[0])
-			}
+		if !reflect.DeepEqual(r.URL.Query(), vals) {
+			t.Errorf("query params = %q; want %q", r.URL.Query(), vals)
 		}
-		w.WriteHeader(http.StatusOK)
 	}))
 	defer storage.Close()
 	storageLockURL = storage.URL
 
 	m, err := New(nil, project, bucket, object)
 	if err != nil {
-		t.Errorf("unable to allocate a cloudmutex global object")
-		return
+		t.Fatal("unable to allocate a cloudmutex global object")
 	}
 	m.Lock()
 }
@@ -64,7 +60,7 @@ func TestUnlock(t *testing.T) {
 		}
 		path := "/b/cloudmutex/o/lock"
 		if r.URL.Path != path {
-			t.Errorf("r.Path = %q; want %q", r.URL.Path, path)
+			t.Errorf("r.URL.Path = %q; want %q", r.URL.Path, path)
 		}
 		w.WriteHeader(http.StatusNoContent)
 	}))
@@ -73,8 +69,7 @@ func TestUnlock(t *testing.T) {
 
 	m, err := New(nil, project, bucket, object)
 	if err != nil {
-		t.Errorf("unable to allocate a cloudmutex global object")
-		return
+		t.Fatal("unable to allocate a cloudmutex global object")
 	}
 	m.Unlock()
 }
@@ -102,8 +97,7 @@ func TestParallel(t *testing.T) {
 	storageUnlockURL = defaultStorageUnlockURL
 	m, err := New(nil, project, bucket, object)
 	if err != nil {
-		t.Errorf("unable to allocate a cloudmutex global object")
-		return
+		t.Fatal("unable to allocate a cloudmutex global object")
 	}
 	done := make(chan struct{}, 1)
 	total := 0
@@ -120,7 +114,7 @@ func TestParallel(t *testing.T) {
 func TestLockTimeout(t *testing.T) {
 	m, err := New(nil, project, bucket, object)
 	if err != nil {
-		t.Errorf("unable to allocate a cloudmutex global object")
+		t.Fatal("unable to allocate a cloudmutex global object")
 		return
 	}
 	Lock(m, 3*time.Second)
@@ -131,7 +125,7 @@ func TestLockTimeout(t *testing.T) {
 func TestUnlockTimeout(t *testing.T) {
 	m, err := New(nil, project, bucket, object)
 	if err != nil {
-		t.Errorf("unable to allocate a cloudmutex global object")
+		t.Fatal("unable to allocate a cloudmutex global object")
 		return
 	}
 	Unlock(m, 3*time.Second)

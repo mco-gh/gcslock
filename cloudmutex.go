@@ -26,6 +26,8 @@ const (
 )
 
 var (
+	// These vars are used in the requests below. Having separate default
+	// values makes it easy to reset the standard config during testing.
 	storageLockURL   = defaultStorageLockURL
 	storageUnlockURL = defaultStorageUnlockURL
 )
