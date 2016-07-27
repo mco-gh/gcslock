@@ -3,6 +3,7 @@ package cloudmutex
 import (
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"sync"
 	"testing"
 	"time"
@@ -25,10 +26,22 @@ func TestLock(t *testing.T) {
 	// google cloud storage stub
 	storage := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "POST" {
-			t.Errorf("unlock request method (%s) != POST", r.Method)
+			t.Errorf("r.Method = %q; want POST", r.Method)
 		}
-		if r.URL.String() != "/b/cloudmutex/o?ifGenerationMatch=0&name=lock&uploadType=media" {
-			t.Errorf("unexpected URL sent for lock request: %s", r.URL.String())
+		path := "/b/cloudmutex/o"
+		if r.URL.Path != path {
+			t.Errorf("r.Path = %q; want %q", r.URL.Path, path)
+		}
+		vals := url.Values{
+			"ifGenerationMatch": []string{"0"},
+			"name":              []string{"lock"},
+			"uploadType":        []string{"media"},
+		}
+		params := r.URL.Query()
+		for k, v := range vals {
+			if v[0] != params[k][0] {
+				t.Errorf("query param %q = %q; want %q", k, params[k][0], v[0])
+			}
 		}
 		w.WriteHeader(http.StatusOK)
 	}))
@@ -47,10 +60,11 @@ func TestUnlock(t *testing.T) {
 	// google cloud storage stub
 	storage := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "DELETE" {
-			t.Errorf("unlock request method (%s) != DELETE", r.Method)
+			t.Errorf("r.Method = %q; want DELETE", r.Method)
 		}
-		if r.URL.String() != "/b/cloudmutex/o/lock" {
-			t.Errorf("unexpected URL sent for unlock request: %s", r.URL.String())
+		path := "/b/cloudmutex/o/lock"
+		if r.URL.Path != path {
+			t.Errorf("r.Path = %q; want %q", r.URL.Path, path)
 		}
 		w.WriteHeader(http.StatusNoContent)
 	}))

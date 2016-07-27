@@ -11,7 +11,6 @@ import (
 
 	"golang.org/x/net/context"
 	"golang.org/x/oauth2/google"
-	storage "google.golang.org/api/storage/v1"
 )
 
 type cloudmutex struct {
@@ -113,7 +112,7 @@ func New(ctx context.Context, project, bucket, object string) (sync.Locker, erro
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	scope := storage.DevstorageFullControlScope
+	scope := "https://www.googleapis.com/auth/devstorage.full_control"
 	client, err := google.DefaultClient(ctx, scope)
 	if err != nil {
 		return nil, err
