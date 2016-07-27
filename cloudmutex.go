@@ -14,6 +14,7 @@ import (
 )
 
 type cloudmutex struct {
+	id      string
 	project string
 	bucket  string
 	object  string
@@ -50,8 +51,23 @@ func Unlock(l sync.Locker, d time.Duration) error {
 	}
 }
 
+// RegisteredLock gives the mutex user the ability to optionally register an
+// identifier to be associated with a lock context. This id is stored in the
+// lock file and can be useful for debugging problems with stale, undeleted
+// locks.
+func (m cloudmutex) RegisteredLock(id string) {
+	m.lock(id)
+}
+
 // Lock waits indefinitely to acquire a global mutex lock.
 func (m cloudmutex) Lock() {
+	m.lock("1")
+}
+
+// Lock waits indefinitely to acquire a global mutex lock.
+
+// lock provides common support for both registered and unregistered locking
+func (m cloudmutex) lock(id string) {
 	q := url.Values{
 		"name":              {m.object},
 		"uploadType":        {"media"},
@@ -60,7 +76,7 @@ func (m cloudmutex) Lock() {
 	url := fmt.Sprintf("https://www.googleapis.com/upload/storage/v1/b/%s/o?%s",
 		m.bucket, q.Encode())
 	for {
-		res, err := m.client.Post(url, "plain/text", bytes.NewReader([]byte("1")))
+		res, err := m.client.Post(url, "plain/text", bytes.NewReader([]byte(id)))
 		if err != nil {
 			continue
 		}
