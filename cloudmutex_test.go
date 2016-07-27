@@ -1,6 +1,8 @@
 package cloudmutex
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"sync"
 	"testing"
 	"time"
@@ -18,6 +20,50 @@ var (
 	lockHolderMu sync.Mutex
 	lockHolder   = -1
 )
+
+func TestLock(t *testing.T) {
+	// google cloud storage stub
+	storage := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "POST" {
+			t.Errorf("unlock request method (%s) != POST", r.Method)
+		}
+		if r.URL.String() != "/b/cloudmutex/o?ifGenerationMatch=0&name=lock&uploadType=media" {
+			t.Errorf("unexpected URL sent for lock request: %s", r.URL.String())
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer storage.Close()
+	storageLockURL = storage.URL
+
+	m, err := New(nil, project, bucket, object)
+	if err != nil {
+		t.Errorf("unable to allocate a cloudmutex global object")
+		return
+	}
+	m.Lock()
+}
+
+func TestUnlock(t *testing.T) {
+	// google cloud storage stub
+	storage := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "DELETE" {
+			t.Errorf("unlock request method (%s) != DELETE", r.Method)
+		}
+		if r.URL.String() != "/b/cloudmutex/o/lock" {
+			t.Errorf("unexpected URL sent for unlock request: %s", r.URL.String())
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer storage.Close()
+	storageUnlockURL = storage.URL
+
+	m, err := New(nil, project, bucket, object)
+	if err != nil {
+		t.Errorf("unable to allocate a cloudmutex global object")
+		return
+	}
+	m.Unlock()
+}
 
 func locker(done chan struct{}, t *testing.T, i int, m sync.Locker) {
 	m.Lock()
@@ -38,6 +84,8 @@ func locker(done chan struct{}, t *testing.T, i int, m sync.Locker) {
 }
 
 func TestParallel(t *testing.T) {
+	storageLockURL = defaultStorageLockURL
+	storageUnlockURL = defaultStorageUnlockURL
 	m, err := New(nil, project, bucket, object)
 	if err != nil {
 		t.Errorf("unable to allocate a cloudmutex global object")
