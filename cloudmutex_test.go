@@ -52,6 +52,28 @@ func TestLock(t *testing.T) {
 	m.Lock()
 }
 
+func TestLockRetry(t *testing.T) {
+	var (
+		retryCount int
+		retryLimit = 5
+	)
+	// google cloud storage stub
+	storage := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if retryCount < retryLimit {
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+		retryCount++
+	}))
+	defer storage.Close()
+	storageLockURL = storage.URL
+
+	m, err := New(nil, project, bucket, object)
+	if err != nil {
+		t.Fatal("unable to allocate a cloudmutex global object")
+	}
+	m.Lock()
+}
+
 func TestUnlock(t *testing.T) {
 	// google cloud storage stub
 	storage := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -74,6 +96,30 @@ func TestUnlock(t *testing.T) {
 	m.Unlock()
 }
 
+func TestUnlockRetry(t *testing.T) {
+	var (
+		retryCount int
+		retryLimit = 5
+	)
+	// google cloud storage stub
+	storage := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if retryCount < retryLimit {
+			w.WriteHeader(http.StatusInternalServerError)
+		} else {
+			w.WriteHeader(http.StatusNoContent)
+		}
+		retryCount++
+	}))
+	defer storage.Close()
+	storageUnlockURL = storage.URL
+
+	m, err := New(nil, project, bucket, object)
+	if err != nil {
+		t.Fatal("unable to allocate a cloudmutex global object")
+	}
+	m.Unlock()
+}
+
 func locker(done chan struct{}, t *testing.T, i int, m sync.Locker) {
 	m.Lock()
 	lockHolderMu.Lock()
@@ -84,7 +130,7 @@ func locker(done chan struct{}, t *testing.T, i int, m sync.Locker) {
 	lockHolder = i
 	lockHolderMu.Unlock()
 	t.Logf("locked by %d", i)
-	time.Sleep(10 * time.Millisecond)
+	time.Sleep(5 * time.Millisecond)
 	lockHolderMu.Lock()
 	lockHolder = -1
 	lockHolderMu.Unlock()
@@ -110,24 +156,59 @@ func TestParallel(t *testing.T) {
 	}
 }
 
-/* TODO: add testing for timed lock (both success and timeout cases)
-func TestLockTimeout(t *testing.T) {
-	m, err := New(nil, project, bucket, object)
-	if err != nil {
-		t.Fatal("unable to allocate a cloudmutex global object")
-		return
-	}
-	Lock(m, 3*time.Second)
-}
-*/
+const timeoutSeconds = 1
 
-/* TODO: add testing for timed unlock (both success and timeout cases)
-func TestUnlockTimeout(t *testing.T) {
+func TestLockTimeout(t *testing.T) {
+	var keepSleeping = true
+	// google cloud storage stub
+	storage := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		for keepSleeping {
+			time.Sleep(100 * time.Millisecond)
+		}
+	}))
+	defer storage.Close()
+	storageLockURL = storage.URL
+
 	m, err := New(nil, project, bucket, object)
 	if err != nil {
 		t.Fatal("unable to allocate a cloudmutex global object")
-		return
 	}
-	Unlock(m, 3*time.Second)
+	start := time.Now()
+	err = Lock(m, timeoutSeconds*time.Second)
+	if err == nil {
+		t.Error("expected timeout didn't occur")
+	}
+	elapsedSeconds := time.Since(start).Seconds()
+	keepSleeping = false
+	if elapsedSeconds < timeoutSeconds {
+		t.Errorf("expected %v seconds, took %v seconds", timeoutSeconds, elapsedSeconds)
+	}
 }
-*/
+
+func TestUnlockTimeout(t *testing.T) {
+	var keepSleeping = true
+	// google cloud storage stub
+	storage := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		for keepSleeping {
+			time.Sleep(100 * time.Millisecond)
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer storage.Close()
+	storageUnlockURL = storage.URL
+
+	m, err := New(nil, project, bucket, object)
+	if err != nil {
+		t.Fatal("unable to allocate a cloudmutex global object")
+	}
+	start := time.Now()
+	err = Unlock(m, timeoutSeconds*time.Second)
+	if err == nil {
+		t.Error("expected timeout didn't occur")
+	}
+	elapsedSeconds := time.Since(start).Seconds()
+	keepSleeping = false
+	if elapsedSeconds < timeoutSeconds {
+		t.Errorf("expected %v seconds, took %v seconds", timeoutSeconds, elapsedSeconds)
+	}
+}

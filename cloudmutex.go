@@ -32,7 +32,7 @@ var (
 	storageUnlockURL = defaultStorageUnlockURL
 )
 
-// Lock waits up to duruation d for l.Lock() to succeed.
+// Lock waits up to duration d for l.Lock() to succeed.
 func Lock(l sync.Locker, d time.Duration) error {
 	done := make(chan struct{}, 1)
 	go func() {
@@ -47,7 +47,7 @@ func Lock(l sync.Locker, d time.Duration) error {
 	}
 }
 
-// Unlock waits up to duruation d for l.Unlock() to succeed.
+// Unlock waits up to duration d for l.Unlock() to succeed.
 func Unlock(l sync.Locker, d time.Duration) error {
 	done := make(chan struct{}, 1)
 	go func() {
@@ -70,36 +70,39 @@ func (m cloudmutex) Lock() {
 		"ifGenerationMatch": {"0"},
 	}
 	url := fmt.Sprintf("%s/b/%s/o?%s", storageLockURL, m.bucket, q.Encode())
+	// Time to wait between retries in milliseconds
+	retryDelay := 1
 	for {
 		res, err := m.client.Post(url, "plain/text", bytes.NewReader([]byte("1")))
-		if err != nil {
-			continue
+		if err == nil {
+			res.Body.Close()
+			if res.StatusCode == 200 {
+				return
+			}
 		}
-		res.Body.Close()
-		if res.StatusCode == 200 {
-			return
-		}
+		time.Sleep(time.Duration(retryDelay) * time.Millisecond)
+		retryDelay *= 2
 	}
 }
 
 // Unlock waits indefinitely to relinquish a global mutex lock.
 func (m cloudmutex) Unlock() {
 	url := fmt.Sprintf("%s/b/%s/o/%s?", storageUnlockURL, m.bucket, m.object)
+	// Time to wait between retries in milliseconds
+	retryDelay := 1
 	for {
-		for {
-			req, err := http.NewRequest("DELETE", url, nil)
-			if err != nil {
-				continue
-			}
+		req, err := http.NewRequest("DELETE", url, nil)
+		if err == nil {
 			res, err := m.client.Do(req)
-			if err != nil {
-				continue
-			}
-			res.Body.Close()
-			if res.StatusCode == 204 {
-				return
+			if err == nil {
+				res.Body.Close()
+				if res.StatusCode == 204 {
+					return
+				}
 			}
 		}
+		time.Sleep(time.Duration(retryDelay) * time.Millisecond)
+		retryDelay *= 2
 	}
 }
 
