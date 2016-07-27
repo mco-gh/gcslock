@@ -4,13 +4,13 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"golang.org/x/net/context"
-	"golang.org/x/oauth2/google"
-	storage "google.golang.org/api/storage/v1"
 	"net/http"
 	"net/url"
 	"sync"
 	"time"
+
+	"golang.org/x/net/context"
+	"golang.org/x/oauth2/google"
 )
 
 type cloudmutex struct {
@@ -19,6 +19,18 @@ type cloudmutex struct {
 	object  string
 	client  *http.Client
 }
+
+const (
+	defaultStorageLockURL   = "https://www.googleapis.com/upload/storage/v1"
+	defaultStorageUnlockURL = "https://www.googleapis.com/storage/v1"
+)
+
+var (
+	// These vars are used in the requests below. Having separate default
+	// values makes it easy to reset the standard config during testing.
+	storageLockURL   = defaultStorageLockURL
+	storageUnlockURL = defaultStorageUnlockURL
+)
 
 // Lock waits up to duruation d for l.Lock() to succeed.
 func Lock(l sync.Locker, d time.Duration) error {
@@ -57,8 +69,7 @@ func (m cloudmutex) Lock() {
 		"uploadType":        {"media"},
 		"ifGenerationMatch": {"0"},
 	}
-	url := fmt.Sprintf("https://www.googleapis.com/upload/storage/v1/b/%s/o?%s",
-		m.bucket, q.Encode())
+	url := fmt.Sprintf("%s/b/%s/o?%s", storageLockURL, m.bucket, q.Encode())
 	for {
 		res, err := m.client.Post(url, "plain/text", bytes.NewReader([]byte("1")))
 		if err != nil {
@@ -73,7 +84,7 @@ func (m cloudmutex) Lock() {
 
 // Unlock waits indefinitely to relinquish a global mutex lock.
 func (m cloudmutex) Unlock() {
-	url := "https://www.googleapis.com/storage/v1/b/" + m.bucket + "/o/" + m.object
+	url := fmt.Sprintf("%s/b/%s/o/%s?", storageUnlockURL, m.bucket, m.object)
 	for {
 		for {
 			req, err := http.NewRequest("DELETE", url, nil)
@@ -103,7 +114,7 @@ func New(ctx context.Context, project, bucket, object string) (sync.Locker, erro
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	scope := storage.DevstorageFullControlScope
+	scope := "https://www.googleapis.com/auth/devstorage.full_control"
 	client, err := google.DefaultClient(ctx, scope)
 	if err != nil {
 		return nil, err
