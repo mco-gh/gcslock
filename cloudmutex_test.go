@@ -123,7 +123,7 @@ func TestUnlock(t *testing.T) {
 	}()
 	select {
 	case <-time.After(time.Second):
-		t.Errorf("m.Unlock() took too long to lock")
+		t.Errorf("m.Unlock() took too long to unlock")
 	case <-done:
 		// pass
 	}
@@ -157,7 +157,7 @@ func TestUnlockRetry(t *testing.T) {
 	}()
 	select {
 	case <-time.After(time.Second):
-		t.Errorf("m.Unlock() took too long to lock")
+		t.Errorf("m.Unlock() took too long to unlock")
 	case <-done:
 		// pass
 	}
