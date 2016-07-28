@@ -49,20 +49,30 @@ func TestLock(t *testing.T) {
 	if err != nil {
 		t.Fatal("unable to allocate a cloudmutex global object")
 	}
-	m.Lock()
+	done := make(chan struct{})
+	go func() {
+		m.Lock()
+		close(done)
+	}()
+	select {
+	case <-time.After(time.Second):
+		t.Errorf("m.Lock() took too long to lock")
+	case <-done:
+		// pass
+	}
 }
 
 func TestLockRetry(t *testing.T) {
 	var (
 		retryCount int
-		retryLimit = 5
+		retryLimit = 2
 	)
 	// google cloud storage stub
 	storage := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if retryCount < retryLimit {
 			w.WriteHeader(http.StatusInternalServerError)
+			retryCount++
 		}
-		retryCount++
 	}))
 	defer storage.Close()
 	storageLockURL = storage.URL
@@ -71,7 +81,20 @@ func TestLockRetry(t *testing.T) {
 	if err != nil {
 		t.Fatal("unable to allocate a cloudmutex global object")
 	}
-	m.Lock()
+	done := make(chan struct{})
+	go func() {
+		m.Lock()
+		close(done)
+	}()
+	select {
+	case <-time.After(time.Second):
+		t.Errorf("m.Lock() took too long to lock")
+	case <-done:
+		// pass
+	}
+	if retryCount < retryLimit {
+		t.Errorf("retryCount = %d; want %d", retryCount, retryLimit)
+	}
 }
 
 func TestUnlock(t *testing.T) {
@@ -93,22 +116,32 @@ func TestUnlock(t *testing.T) {
 	if err != nil {
 		t.Fatal("unable to allocate a cloudmutex global object")
 	}
-	m.Unlock()
+	done := make(chan struct{})
+	go func() {
+		m.Unlock()
+		close(done)
+	}()
+	select {
+	case <-time.After(time.Second):
+		t.Errorf("m.Unlock() took too long to lock")
+	case <-done:
+		// pass
+	}
 }
 
 func TestUnlockRetry(t *testing.T) {
 	var (
 		retryCount int
-		retryLimit = 5
+		retryLimit = 2
 	)
 	// google cloud storage stub
 	storage := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if retryCount < retryLimit {
 			w.WriteHeader(http.StatusInternalServerError)
+			retryCount++
 		} else {
 			w.WriteHeader(http.StatusNoContent)
 		}
-		retryCount++
 	}))
 	defer storage.Close()
 	storageUnlockURL = storage.URL
@@ -117,7 +150,20 @@ func TestUnlockRetry(t *testing.T) {
 	if err != nil {
 		t.Fatal("unable to allocate a cloudmutex global object")
 	}
-	m.Unlock()
+	done := make(chan struct{})
+	go func() {
+		m.Unlock()
+		close(done)
+	}()
+	select {
+	case <-time.After(time.Second):
+		t.Errorf("m.Unlock() took too long to lock")
+	case <-done:
+		// pass
+	}
+	if retryCount < retryLimit {
+		t.Errorf("retryCount = %d; want %d", retryCount, retryLimit)
+	}
 }
 
 func locker(done chan struct{}, t *testing.T, i int, m sync.Locker) {

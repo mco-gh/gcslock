@@ -70,9 +70,7 @@ func (m cloudmutex) Lock() {
 		"ifGenerationMatch": {"0"},
 	}
 	url := fmt.Sprintf("%s/b/%s/o?%s", storageLockURL, m.bucket, q.Encode())
-	// Time to wait between retries in milliseconds
-	retryDelay := 1
-	for {
+	for i := 1; ; i *= 2 {
 		res, err := m.client.Post(url, "plain/text", bytes.NewReader([]byte("1")))
 		if err == nil {
 			res.Body.Close()
@@ -80,17 +78,14 @@ func (m cloudmutex) Lock() {
 				return
 			}
 		}
-		time.Sleep(time.Duration(retryDelay) * time.Millisecond)
-		retryDelay *= 2
+		time.Sleep(time.Duration(i) * time.Millisecond)
 	}
 }
 
 // Unlock waits indefinitely to relinquish a global mutex lock.
 func (m cloudmutex) Unlock() {
 	url := fmt.Sprintf("%s/b/%s/o/%s?", storageUnlockURL, m.bucket, m.object)
-	// Time to wait between retries in milliseconds
-	retryDelay := 1
-	for {
+	for i := 1; ; i *= 2 {
 		req, err := http.NewRequest("DELETE", url, nil)
 		if err == nil {
 			res, err := m.client.Do(req)
@@ -101,8 +96,7 @@ func (m cloudmutex) Unlock() {
 				}
 			}
 		}
-		time.Sleep(time.Duration(retryDelay) * time.Millisecond)
-		retryDelay *= 2
+		time.Sleep(time.Duration(i) * time.Millisecond)
 	}
 }
 
