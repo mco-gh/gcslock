@@ -204,57 +204,34 @@ func TestParallel(t *testing.T) {
 
 const timeoutSeconds = 1
 
-func TestLockTimeout(t *testing.T) {
-	var keepSleeping = true
-	// google cloud storage stub
-	storage := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		for keepSleeping {
-			time.Sleep(100 * time.Millisecond)
-		}
-	}))
-	defer storage.Close()
-	storageLockURL = storage.URL
+// This type is used to mock the sync.Lock interface provided by cloudmutex.
+type mockLocker struct {
+	wait time.Duration
+}
 
-	m, err := New(nil, project, bucket, object)
-	if err != nil {
-		t.Fatal("unable to allocate a cloudmutex global object")
+func (l *mockLocker) Lock() {
+	time.Sleep(l.wait)
+}
+func (l *mockLocker) Unlock() {
+	time.Sleep(l.wait)
+}
+
+func TestLockTimeout(t *testing.T) {
+	m := &mockLocker{10 * time.Millisecond}
+	if err := Lock(m, time.Millisecond); err == nil {
+		t.Errorf("want lock error for Lock(m, 1ms)")
 	}
-	start := time.Now()
-	err = Lock(m, timeoutSeconds*time.Second)
-	if err == nil {
-		t.Error("expected timeout didn't occur")
-	}
-	elapsedSeconds := time.Since(start).Seconds()
-	keepSleeping = false
-	if elapsedSeconds < timeoutSeconds {
-		t.Errorf("expected %v seconds, took %v seconds", timeoutSeconds, elapsedSeconds)
+	if err := Lock(m, 100*time.Millisecond); err != nil {
+		t.Errorf("Lock(m, 100ms): %v", err)
 	}
 }
 
 func TestUnlockTimeout(t *testing.T) {
-	var keepSleeping = true
-	// google cloud storage stub
-	storage := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		for keepSleeping {
-			time.Sleep(100 * time.Millisecond)
-		}
-		w.WriteHeader(http.StatusNoContent)
-	}))
-	defer storage.Close()
-	storageUnlockURL = storage.URL
-
-	m, err := New(nil, project, bucket, object)
-	if err != nil {
-		t.Fatal("unable to allocate a cloudmutex global object")
+	m := &mockLocker{10 * time.Millisecond}
+	if err := Unlock(m, time.Millisecond); err == nil {
+		t.Errorf("want unlock error for Unlock(m, 1ms)")
 	}
-	start := time.Now()
-	err = Unlock(m, timeoutSeconds*time.Second)
-	if err == nil {
-		t.Error("expected timeout didn't occur")
-	}
-	elapsedSeconds := time.Since(start).Seconds()
-	keepSleeping = false
-	if elapsedSeconds < timeoutSeconds {
-		t.Errorf("expected %v seconds, took %v seconds", timeoutSeconds, elapsedSeconds)
+	if err := Unlock(m, 100*time.Millisecond); err != nil {
+		t.Errorf("Unlock(m, 100ms): %v", err)
 	}
 }
