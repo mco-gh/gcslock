@@ -49,7 +49,52 @@ func TestLock(t *testing.T) {
 	if err != nil {
 		t.Fatal("unable to allocate a cloudmutex global object")
 	}
-	m.Lock()
+	done := make(chan struct{})
+	go func() {
+		m.Lock()
+		close(done)
+	}()
+	select {
+	case <-time.After(time.Second):
+		t.Errorf("m.Lock() took too long to lock")
+	case <-done:
+		// pass
+	}
+}
+
+func TestLockRetry(t *testing.T) {
+	var (
+		retryCount int
+		retryLimit = 2
+	)
+	// google cloud storage stub
+	storage := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if retryCount < retryLimit {
+			w.WriteHeader(http.StatusInternalServerError)
+			retryCount++
+		}
+	}))
+	defer storage.Close()
+	storageLockURL = storage.URL
+
+	m, err := New(nil, project, bucket, object)
+	if err != nil {
+		t.Fatal("unable to allocate a cloudmutex global object")
+	}
+	done := make(chan struct{})
+	go func() {
+		m.Lock()
+		close(done)
+	}()
+	select {
+	case <-time.After(time.Second):
+		t.Errorf("m.Lock() took too long to lock")
+	case <-done:
+		// pass
+	}
+	if retryCount < retryLimit {
+		t.Errorf("retryCount = %d; want %d", retryCount, retryLimit)
+	}
 }
 
 func TestUnlock(t *testing.T) {
@@ -71,7 +116,54 @@ func TestUnlock(t *testing.T) {
 	if err != nil {
 		t.Fatal("unable to allocate a cloudmutex global object")
 	}
-	m.Unlock()
+	done := make(chan struct{})
+	go func() {
+		m.Unlock()
+		close(done)
+	}()
+	select {
+	case <-time.After(time.Second):
+		t.Errorf("m.Unlock() took too long to unlock")
+	case <-done:
+		// pass
+	}
+}
+
+func TestUnlockRetry(t *testing.T) {
+	var (
+		retryCount int
+		retryLimit = 2
+	)
+	// google cloud storage stub
+	storage := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if retryCount < retryLimit {
+			w.WriteHeader(http.StatusInternalServerError)
+			retryCount++
+		} else {
+			w.WriteHeader(http.StatusNoContent)
+		}
+	}))
+	defer storage.Close()
+	storageUnlockURL = storage.URL
+
+	m, err := New(nil, project, bucket, object)
+	if err != nil {
+		t.Fatal("unable to allocate a cloudmutex global object")
+	}
+	done := make(chan struct{})
+	go func() {
+		m.Unlock()
+		close(done)
+	}()
+	select {
+	case <-time.After(time.Second):
+		t.Errorf("m.Unlock() took too long to unlock")
+	case <-done:
+		// pass
+	}
+	if retryCount < retryLimit {
+		t.Errorf("retryCount = %d; want %d", retryCount, retryLimit)
+	}
 }
 
 func locker(done chan struct{}, t *testing.T, i int, m sync.Locker) {
@@ -84,7 +176,7 @@ func locker(done chan struct{}, t *testing.T, i int, m sync.Locker) {
 	lockHolder = i
 	lockHolderMu.Unlock()
 	t.Logf("locked by %d", i)
-	time.Sleep(10 * time.Millisecond)
+	time.Sleep(5 * time.Millisecond)
 	lockHolderMu.Lock()
 	lockHolder = -1
 	lockHolderMu.Unlock()
@@ -110,24 +202,34 @@ func TestParallel(t *testing.T) {
 	}
 }
 
-/* TODO: add testing for timed lock (both success and timeout cases)
-func TestLockTimeout(t *testing.T) {
-	m, err := New(nil, project, bucket, object)
-	if err != nil {
-		t.Fatal("unable to allocate a cloudmutex global object")
-		return
-	}
-	Lock(m, 3*time.Second)
+// This type is used to mock the sync.Lock interface provided by cloudmutex.
+type mockLocker struct {
+	wait time.Duration
 }
-*/
 
-/* TODO: add testing for timed unlock (both success and timeout cases)
-func TestUnlockTimeout(t *testing.T) {
-	m, err := New(nil, project, bucket, object)
-	if err != nil {
-		t.Fatal("unable to allocate a cloudmutex global object")
-		return
-	}
-	Unlock(m, 3*time.Second)
+func (l *mockLocker) Lock() {
+	time.Sleep(l.wait)
 }
-*/
+func (l *mockLocker) Unlock() {
+	time.Sleep(l.wait)
+}
+
+func TestLockTimeout(t *testing.T) {
+	m := &mockLocker{10 * time.Millisecond}
+	if err := Lock(m, time.Millisecond); err == nil {
+		t.Errorf("want lock error for Lock(m, 1ms)")
+	}
+	if err := Lock(m, 100*time.Millisecond); err != nil {
+		t.Errorf("Lock(m, 100ms): %v", err)
+	}
+}
+
+func TestUnlockTimeout(t *testing.T) {
+	m := &mockLocker{10 * time.Millisecond}
+	if err := Unlock(m, time.Millisecond); err == nil {
+		t.Errorf("want unlock error for Unlock(m, 1ms)")
+	}
+	if err := Unlock(m, 100*time.Millisecond); err != nil {
+		t.Errorf("Unlock(m, 100ms): %v", err)
+	}
+}
