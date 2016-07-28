@@ -202,8 +202,6 @@ func TestParallel(t *testing.T) {
 	}
 }
 
-const timeoutSeconds = 1
-
 // This type is used to mock the sync.Lock interface provided by cloudmutex.
 type mockLocker struct {
 	wait time.Duration
