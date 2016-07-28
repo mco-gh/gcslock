@@ -1,4 +1,4 @@
-package cloudmutex
+package gcslock
 
 import (
 	"bytes"
@@ -13,7 +13,7 @@ import (
 	"golang.org/x/oauth2/google"
 )
 
-type cloudmutex struct {
+type mutex struct {
 	project string
 	bucket  string
 	object  string
@@ -63,7 +63,7 @@ func Unlock(l sync.Locker, d time.Duration) error {
 }
 
 // Lock waits indefinitely to acquire a global mutex lock.
-func (m cloudmutex) Lock() {
+func (m mutex) Lock() {
 	q := url.Values{
 		"name":              {m.object},
 		"uploadType":        {"media"},
@@ -83,7 +83,7 @@ func (m cloudmutex) Lock() {
 }
 
 // Unlock waits indefinitely to relinquish a global mutex lock.
-func (m cloudmutex) Unlock() {
+func (m mutex) Unlock() {
 	url := fmt.Sprintf("%s/b/%s/o/%s?", storageUnlockURL, m.bucket, m.object)
 	for i := 1; ; i *= 2 {
 		req, err := http.NewRequest("DELETE", url, nil)
@@ -116,7 +116,7 @@ func New(ctx context.Context, project, bucket, object string) (sync.Locker, erro
 	if err != nil {
 		return nil, err
 	}
-	m := &cloudmutex{
+	m := &mutex{
 		project: project,
 		bucket:  bucket,
 		object:  object,
