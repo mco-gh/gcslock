@@ -1,4 +1,4 @@
-package cloudmutex
+package gcslock
 
 import (
 	"net/http"
@@ -12,7 +12,7 @@ import (
 
 const (
 	project = "marc-general"
-	bucket  = "cloudmutex"
+	bucket  = "gcslock"
 	object  = "lock"
 )
 
@@ -29,7 +29,7 @@ func TestLock(t *testing.T) {
 		if r.Method != "POST" {
 			t.Errorf("r.Method = %q; want POST", r.Method)
 		}
-		path := "/b/cloudmutex/o"
+		path := "/b/gcslock/o"
 		if r.URL.Path != path {
 			t.Errorf("r.URL.Path = %q; want %q", r.URL.Path, path)
 		}
@@ -47,7 +47,7 @@ func TestLock(t *testing.T) {
 
 	m, err := New(nil, project, bucket, object)
 	if err != nil {
-		t.Fatal("unable to allocate a cloudmutex global object")
+		t.Fatal("unable to allocate a gcslock.mutex object")
 	}
 	done := make(chan struct{})
 	go func() {
@@ -79,7 +79,7 @@ func TestLockRetry(t *testing.T) {
 
 	m, err := New(nil, project, bucket, object)
 	if err != nil {
-		t.Fatal("unable to allocate a cloudmutex global object")
+		t.Fatal("unable to allocate a gcslock.mutex object")
 	}
 	done := make(chan struct{})
 	go func() {
@@ -103,7 +103,7 @@ func TestUnlock(t *testing.T) {
 		if r.Method != "DELETE" {
 			t.Errorf("r.Method = %q; want DELETE", r.Method)
 		}
-		path := "/b/cloudmutex/o/lock"
+		path := "/b/gcslock/o/lock"
 		if r.URL.Path != path {
 			t.Errorf("r.URL.Path = %q; want %q", r.URL.Path, path)
 		}
@@ -114,7 +114,7 @@ func TestUnlock(t *testing.T) {
 
 	m, err := New(nil, project, bucket, object)
 	if err != nil {
-		t.Fatal("unable to allocate a cloudmutex global object")
+		t.Fatal("unable to allocate a gcslock.mutex object")
 	}
 	done := make(chan struct{})
 	go func() {
@@ -148,7 +148,7 @@ func TestUnlockRetry(t *testing.T) {
 
 	m, err := New(nil, project, bucket, object)
 	if err != nil {
-		t.Fatal("unable to allocate a cloudmutex global object")
+		t.Fatal("unable to allocate a gcslock.mutex object")
 	}
 	done := make(chan struct{})
 	go func() {
@@ -189,7 +189,7 @@ func TestParallel(t *testing.T) {
 	storageUnlockURL = defaultStorageUnlockURL
 	m, err := New(nil, project, bucket, object)
 	if err != nil {
-		t.Fatal("unable to allocate a cloudmutex global object")
+		t.Fatal("unable to allocate a gcslock.mutex object")
 	}
 	done := make(chan struct{}, 1)
 	total := 0
@@ -202,7 +202,7 @@ func TestParallel(t *testing.T) {
 	}
 }
 
-// This type is used to mock the sync.Lock interface provided by cloudmutex.
+// This type is used to mock the sync.Lock interface.
 type mockLocker struct {
 	wait time.Duration
 }
