@@ -1,5 +1,5 @@
 
-gcslock is a scalable, distributed mutex that can be used to serialize computations anywhere on the global internet. (Disclaimer: The author works for Gogole but this is not an official Google product.)
+*gcslock* is a scalable, distributed mutex that can be used to serialize computations anywhere on the global internet. (Disclaimer: The author works for Gogole but this is not an official Google product.)
 
 # What is this?
 
@@ -18,7 +18,7 @@ Fast forward to more modern times. I faced a design problem that required serial
 
 I dismissed Amazon's S3 an an implementation choice because it offers only eventual consistency, meaning that object changes made at one point in time are not guaranteed to be seen by other processes until some (typically short) period of time in the future. Obviously this will not work for a mutex, which requires all contending processes to see precisely the same state at the same time. Otherwise, two processes contending for a lock could easily find themselves both believing they had successfully acquired it.
 
-Google Cloud Storage implements read-after-write consistency, meaning when a change is written, any process that reads that object, anywhere on the planet, is guantanteed to see the change. In other words, GCS offers an integrity model that works, at global scope, very similary to the way a local file system works, where we take for granted that changes to a file are guaranteed to be seen, immediately after the change, by all subsequent readers.
+Google Cloud Storage implements [strong consistency](https://cloud.google.com/storage/docs/consistency) for the relevant operations, meaning when a change is written, any process that reads that object, anywhere on the planet, is guantanteed to see the change. In other words, GCS offers an integrity model that works, at global scope, very similary to the way a local file system works, where we take for granted that changes to a file are guaranteed to be seen, immediately after the change, by all subsequent readers.
 
 But how to implement "create once" semantics? If contending processes attempt to create a lock file in the cloud, won't they simply overwrite each other's objects? Well, thanks to another GCS feature, [object versioning](https://cloud.google.com/storage/docs/object-versioning), we can request precisely the semantics we need:
 
@@ -49,4 +49,27 @@ m.Lock()
 m.Unlock()
 ```
 
-# Limitations
+# Wait, there's more...
+
+The Lock() and Unlock() methods implemented by this package follow the same semantics as the standard golang sync.Mutex interface: they block indefinitely waiting to acquire or relinquish a lock. But sometimes you can't afford to wait forever or something to happen. Of course, you can implement your own timeout logic but to make life easier for clients, this library offers a built-in version of Lock() and Unlock() package level functions which accept a timeout value, expressed as a `time.duration`. Here's an example use of each:
+
+```
+// Wait up to 100ms to acquire a lock.
+if err := gcslock.Lock(m, 100*time.Millisecond); err != nil {
+  // deal with timeout
+}
+
+// Wait up to 100ms to relinquish a lock.
+if err := gcslock.Unlock(m, 100*time.Millisecond); err != nil {
+  // deal with timeout
+}
+```
+
+# Limitations (read the fine print)
+
+1. Performance - Because acquiring and relinquishing locks require discrete cloud storage operations, (gross understatement coming) this is not the most efficient mutex in the world. In practice, I've found that, in the absence of contention and retries, it requires on the order of 10 milliseconds to acquire or relinquish a lock. This is perfectly sufficient for most batch workloads, like my original motivating use case, but it's probably unacceptable for any application requiring pseudo-real time resposiveness.
+
+2. Reliability/Resilience - Unfortunately, if a process acquires the lock and dies before relinquishing, the entire mutex is deadlocked. In a closed system in which you are trying to debug problems, this can sometimes be the desired behavior, but for most applications I see this as a serious problem. There are two ways around this issue:
+
+* Implement a "lock watcher" which peridically checks the lock age and deletes any lockfile older than a configurable threshold. Unfortunately, now you have a new problem: what happens if the lock watcher dies?
+* Ideally the underlying storage mechanism would have a way to automatically delete any lockfile older than a configurable perid of time. *Good news*: Google Cloud Storage implements just such a feature called [Life Cycle Management](https://cloud.google.com/storage/docs/lifecycle). *Bad news*: The time unit, and minimum specifiable life span, is one day. So as long as you don't mind your mutex deadlocking for 24 hours, you're all set. This experience has motivated a feature request to the Google Cloud Storage team to support finer granularity in specifiying object lifetimes.
