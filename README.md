@@ -26,10 +26,27 @@ But how to implement "create once" semantics? If contending processes attempt to
 
 This is exactly the sort of guarantee provided by the kernel when we attempt to create a file system link. The combination of read-after-write consistency and atomic create-once semantics gives us everything we need to build a distributed mutex that can be used to serialize computations anywhere across the internet.
 
-# Ok, so how do I use it?
+# How do I install it?
 
-The reference implementation in this repo is written in Go. To use gcslock,
-do the following:
+The reference implementation in this repo is written in Go. To use gcslock in a Go program, do the following:
 
-1. Obtain the library via 'go get github.com/marcacohen/gcsmutex'.
-1. 
+1. Setup a new project at the [Google APIs Console](https://console.developers.google.com) and enable the Cloud Storage API.
+1. Install the [Google Cloud SDK](https://cloud.google.com/sdk/downloads) tool and configure your project project and your OAuth credentials.
+1. Create a bucket in which to store your lock file using the command `gsutil mb gs://your-bucket-name`.
+1. Enable object versioning in your bucket using the command `gsutil versioning set on gs://your-bucket-name`.
+
+# How do I use it?
+
+In your Go code, import the gcslock package by including `github.com/marcacohen/gcslock` at the top of your source file and protect your code as follows:
+
+```
+m, err := gcslock.New(nil, project, bucket, object)
+if err != nil {
+  // deal with problem allocating a gcslock.mutex object
+}
+m.Lock()
+// Protected and globally serialized computation happens here.
+m.Unlock()
+```
+
+# Limitations
