@@ -1,5 +1,5 @@
 
-*gcslock* is a scalable, distributed mutex that can be used to serialize computations anywhere on the global internet. (Disclaimer: The author works for Gogole but this is not an official Google product.)
+**gcslock** is a scalable, distributed mutex that can be used to serialize computations anywhere on the global internet. (Disclaimer: The author works for Gogole but this is not an official Google product.)
 
 # What is this?
 
