@@ -92,8 +92,7 @@ The godoc document can be found [here](https://godoc.org/github.com/marcacohen/g
 1. Install the [Google Cloud SDK](https://cloud.google.com/sdk/downloads) tool and configure your project and your OAuth credentials.
 1. Create a bucket in which to store your lock file using the command `gsutil mb gs://your-bucket-name`.
 1. Enable object versioning in your bucket using the command `gsutil versioning set on gs://your-bucket-name`.
-1. In your Go code, import `github.com/marcacohen/gcslock` in your Go code and
-use it as follows:
+1. In your Go code, import `github.com/marcacohen/gcslock` and use it as follows:
 
 ```go
 m, err := gcslock.New(nil, project, bucket, object)
