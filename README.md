@@ -133,7 +133,7 @@ if err := gcslock.Unlock(m, 100*time.Millisecond); err != nil {
 
 1. Performance - Because acquiring and relinquishing locks require discrete
 cloud storage operations, (gross understatement coming) this is not the most
-efficient mutex in the world. In practice, I've found that, in the absence
+efficient mutex in the world. In practice I've found that, in the absence
 of contention and retries, it requires on the order of 10 milliseconds to
 acquire or relinquish a lock. This is perfectly sufficient for most batch
 workloads, like my original motivating use case, but it's probably unacceptable
