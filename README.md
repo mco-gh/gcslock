@@ -137,7 +137,7 @@ efficient mutex in the world. In practice I've found that, in the absence
 of contention and retries, it requires on the order of 10 milliseconds to
 acquire or relinquish a lock. This is perfectly sufficient for most batch
 workloads, like my original motivating use case, but it's probably unacceptable
-for any application requiring pseudo-real time resposiveness.
+for any application requiring pseudo-real time responsiveness.
 
 2. Reliability/Resilience - Unfortunately, if a process acquires the lock
 and dies before relinquishing it, the entire mutex is deadlocked. In a closed
@@ -145,10 +145,10 @@ system in which you are trying to find and debug problems, this can sometimes
 be the desired behavior, but for most applications this is a serious problem.
 There are two ways around this issue:
   * Implement a lock watcher which periodically checks the lock age and deletes
-any lockfile older than a configurable threshold. Unfortunately, now you have
+any lock object older than a configurable threshold. Unfortunately, now you have
 a new problem: what happens if the lock watcher dies?
   * Ideally the underlying storage mechanism would provide a way to automatically
-delete any lockfile older than a configurable interval. **Good news**: Google
+delete any lock object older than a configurable interval. **Good news**: Google
 Cloud Storage implements just such a feature called
 [Life Cycle Management](https://cloud.google.com/storage/docs/lifecycle).
 **Bad news**: The time unit, and minimum specifiable life span, is one day,
