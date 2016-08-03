@@ -19,9 +19,13 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"reflect"
+	"sync"
 	"testing"
 	"time"
 )
+
+// make sure mutex pointer satisfies sync.Locker
+var _ sync.Locker = &mutex{}
 
 func TestLock(t *testing.T) {
 	// google cloud storage stub

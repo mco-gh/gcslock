@@ -27,13 +27,6 @@ import (
 	"golang.org/x/oauth2/google"
 )
 
-type mutex struct {
-	project string
-	bucket  string
-	object  string
-	client  *http.Client
-}
-
 const (
 	defaultStorageLockURL   = "https://www.googleapis.com/upload/storage/v1"
 	defaultStorageUnlockURL = "https://www.googleapis.com/storage/v1"
@@ -76,8 +69,15 @@ func Unlock(l sync.Locker, d time.Duration) error {
 	}
 }
 
+type mutex struct {
+	project string
+	bucket  string
+	object  string
+	client  *http.Client
+}
+
 // Lock waits indefinitely to acquire a global mutex lock.
-func (m mutex) Lock() {
+func (m *mutex) Lock() {
 	q := url.Values{
 		"name":              {m.object},
 		"uploadType":        {"media"},
@@ -97,7 +97,7 @@ func (m mutex) Lock() {
 }
 
 // Unlock waits indefinitely to relinquish a global mutex lock.
-func (m mutex) Unlock() {
+func (m *mutex) Unlock() {
 	url := fmt.Sprintf("%s/b/%s/o/%s?", storageUnlockURL, m.bucket, m.object)
 	for i := 1; ; i *= 2 {
 		req, err := http.NewRequest("DELETE", url, nil)
