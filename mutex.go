@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// gcslock is a scalable, distributed mutex that can be used to 
-// serialize computations anywhere on the global internet. 
+// Package gcslock is a scalable, distributed mutex that can be used
+// to serialize computations anywhere on the global internet.
 package gcslock
 
 import (
