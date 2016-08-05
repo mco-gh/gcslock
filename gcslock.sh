@@ -19,17 +19,18 @@
 # of the Google Cloud SDK (https://cloud.google.com/sdk/), which 
 # includes the gsutil command.
 
-if [ "$BUCKET" = "" ]
-then
-  echo "BUCKET env var undefined"
-  exit 1
-fi
 
-LOCK="gs://$BUCKET/lock"
-
-# The lock function expects the BUCKET environment variable to be set
-# to the name of a bucket writable by the user running this script.
+# The lock function expects the first (and only) argument to be
+# the name of a bucket writable by the user running this script.
+# It creates the lock object in the passed bucket with a special
+# header to obtain mutual exclusion.
 lock() {
+  if [ "$1" = "" ]
+  then
+    echo missing bucket argument
+    exit 1
+  fi
+  LOCK="gs://$1/lock"
   sleep_time=1
   while ! echo "lock" | gsutil -q -h "x-goog-if-generation-match:0" cp - $LOCK
   do
@@ -39,11 +40,20 @@ lock() {
   done
 }
 
+# The unlock function expects the first (and only) argument to be
+# the name of a bucket writable by the user running this script.
+# It relinquishes the lock by removing the lock object.
 unlock() {
+  if [ "$1" = "" ]
+  then
+    echo missing bucket argument
+    exit 1
+  fi
+  LOCK="gs://$1/lock"
   gsutil -q rm $LOCK
 }
 
 # Usage example...
-lock
-echo "lock acquired"
-unlock
+# lock mybucket
+# echo "lock acquired"
+# unlock mybucket 
