@@ -129,6 +129,19 @@ if err := gcslock.Unlock(m, 100*time.Millisecond); err != nil {
 }
 ```
 
+## Shell Script Usage
+
+You can also use this technique via the command line using the gsutil
+command, which enables serialization of shell scripts running anywhere.
+The `gcslock.sh` file defines two functions, which give the ability to
+globally lock shell script logic like this:
+```sh
+source gcslock.sh
+lock
+echo "protected logic"
+unlock
+```
+
 ## Limitations (read the fine print)
 
 1. Performance - Because acquiring and relinquishing locks require discrete
