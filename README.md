@@ -137,9 +137,9 @@ The `gcslock.sh` file defines two functions, which give the ability to
 globally lock shell script logic like this:
 ```sh
 source gcslock.sh
-lock
+lock mybucket
 echo "protected logic"
-unlock
+unlock mybucket
 ```
 
 ## Limitations (read the fine print)
