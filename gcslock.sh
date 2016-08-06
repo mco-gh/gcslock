@@ -18,23 +18,31 @@
 # via the gsutil command in a shell script. It depends on installation
 # of the Google Cloud SDK (https://cloud.google.com/sdk/), which 
 # includes the gsutil command.
-
+#
+# Usage example:
+#
+#	source gcslock.sh
+# 	lock mybucket
+# 	echo "lock acquired"
+# 	unlock mybucket 
 
 # The lock function expects the first (and only) argument to be
 # the name of a bucket writable by the user running this script.
 # It creates the lock object in the passed bucket with a special
-# header to obtain mutual exclusion.
+# header to obtain mutual exclusion. If the lock object creation
+# fails, it retries indefinitely with expontential backoff.
+
 lock() {
   if [ "$1" = "" ]
   then
-    echo missing bucket argument
+    echo "lock: missing bucket argument"
     exit 1
   fi
   LOCK="gs://$1/lock"
   sleep_time=1
   while ! echo "lock" | gsutil -q -h "x-goog-if-generation-match:0" cp - $LOCK
   do
-    echo "failed to obtain lock, retrying in $sleep_time seconds"
+    echo "lock: failed to obtain lock, retrying in $sleep_time seconds"
     sleep $sleep_time
     sleep_time=$(expr $sleep_time '*' 2)
   done
@@ -42,18 +50,23 @@ lock() {
 
 # The unlock function expects the first (and only) argument to be
 # the name of a bucket writable by the user running this script.
-# It relinquishes the lock by removing the lock object.
+# It relinquishes the lock by removing the lock object. If the 
+# lock object removal fails, it retries indefinitely with 
+# expontential backoff.
+
 unlock() {
   if [ "$1" = "" ]
   then
-    echo missing bucket argument
+    echo "unlock: missing bucket argument"
     exit 1
   fi
   LOCK="gs://$1/lock"
-  gsutil -q rm $LOCK
+  sleep_time=1
+  while ! gsutil -q rm $LOCK
+  do
+    echo "unlock: failed to relinquish lock, retrying in $sleep_time seconds"
+    sleep $sleep_time
+    sleep_time=$(expr $sleep_time '*' 2)
+  done
 }
 
-# Usage example...
-# lock mybucket
-# echo "lock acquired"
-# unlock mybucket 
