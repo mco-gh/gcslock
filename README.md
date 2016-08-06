@@ -74,7 +74,7 @@ we can request precisely the semantics we need:
 > Cloud Storage aborts the update with a status code of 412 Precondition Failed.
 
 This is exactly the sort of guarantee provided by the kernel when we attempt
-to create a file system link. The combination of read-after-write consistency
+to create a file system link. The combination of strong consistency
 and atomic create-once semantics gives us everything we need to build a
 distributed mutex that can be used to serialize computations anywhere across
 the internet.
