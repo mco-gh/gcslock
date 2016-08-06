@@ -84,7 +84,7 @@ the internet.
 The reference implementation in this repo is written in Go. To use gcslock
 in a Go program, install the code using this command: `go get -u github.com/marcacohen/gcslock`.
 
-The godoc document can be found [here](https://godoc.org/github.com/marcacohen/gsclock).
+The godoc document can be found [here](https://godoc.org/github.com/marcacohen/gcslock).
 
 ## How do I use it?
 
