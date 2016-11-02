@@ -54,7 +54,7 @@ both believing they had successfully acquired it.
 Google Cloud Storage implements
 [strong consistency](https://cloud.google.com/storage/docs/consistency)
 for the relevant operations, meaning when an object is created or destroyed,
-any process that reads that object, anywhere on the planet, is guantanteed
+any process that reads that object, anywhere on the planet, is guaranteed
 to see the change. In other words, GCS offers an integrity model that works,
 at global scope, very similarly to the way a local file system works,
 where we take for granted that changes to a file are guaranteed to be seen,
