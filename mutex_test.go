@@ -29,6 +29,10 @@ import (
 // make sure mutex pointer satisfies sync.Locker
 var _ sync.Locker = &mutex{}
 
+func init() {
+	httpClient = func(context.Context) (*http.Client, error) { return http.DefaultClient, nil }
+}
+
 func TestLock(t *testing.T) {
 	// google cloud storage stub
 	storage := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -50,7 +54,6 @@ func TestLock(t *testing.T) {
 	}))
 	defer storage.Close()
 	storageLockURL = storage.URL
-	httpClient = func(context.Context) (*http.Client, error) { return http.DefaultClient, nil }
 	m, err := New(nil, "stub", "gcslock", "lock")
 	if err != nil {
 		t.Fatal(err)
