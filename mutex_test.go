@@ -22,6 +22,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"golang.org/x/net/context"
 )
 
 // make sure mutex pointer satisfies sync.Locker
@@ -48,10 +50,10 @@ func TestLock(t *testing.T) {
 	}))
 	defer storage.Close()
 	storageLockURL = storage.URL
-
+	httpClient = func(context.Context) (*http.Client, error) { return http.DefaultClient, nil }
 	m, err := New(nil, "stub", "gcslock", "lock")
 	if err != nil {
-		t.Fatal("unable to allocate a gcslock.mutex object")
+		t.Fatal(err)
 	}
 	done := make(chan struct{})
 	go func() {
@@ -83,7 +85,7 @@ func TestLockRetry(t *testing.T) {
 
 	m, err := New(nil, "stub", "gcslock", "lock")
 	if err != nil {
-		t.Fatal("unable to allocate a gcslock.mutex object")
+		t.Fatal(err)
 	}
 	done := make(chan struct{})
 	go func() {
@@ -118,7 +120,7 @@ func TestUnlock(t *testing.T) {
 
 	m, err := New(nil, "stub", "gcslock", "lock")
 	if err != nil {
-		t.Fatal("unable to allocate a gcslock.mutex object")
+		t.Fatal(err)
 	}
 	done := make(chan struct{})
 	go func() {
@@ -152,7 +154,7 @@ func TestUnlockRetry(t *testing.T) {
 
 	m, err := New(nil, "stub", "gcslock", "lock")
 	if err != nil {
-		t.Fatal("unable to allocate a gcslock.mutex object")
+		t.Fatal(err)
 	}
 	done := make(chan struct{})
 	go func() {
