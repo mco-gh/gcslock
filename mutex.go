@@ -44,10 +44,12 @@ var (
 // Lock waits up to duration d for l.Lock() to succeed.
 func Lock(l sync.Locker, d time.Duration) error {
 	done := make(chan struct{}, 1)
-	go func() {
+	ctx, cancel := context.WithTimeout(context.Background(), d*time.Second)
+	defer cancel()
+	go func(context.Context) {
 		l.Lock()
 		done <- struct{}{}
-	}()
+	}(ctx)
 	select {
 	case <-done:
 		return nil
@@ -116,6 +118,12 @@ func (m *mutex) Unlock() {
 	}
 }
 
+// httpClient is overwritten in tests
+var httpClient = func(ctx context.Context) (*http.Client, error) {
+	const scope = "https://www.googleapis.com/auth/devstorage.full_control"
+	return google.DefaultClient(ctx, scope)
+}
+
 // New creates a GCS-based sync.Locker.
 // It uses Application Default Credentials to make authenticated requests
 // to Google Cloud Storage. See the DefaultClient function of the
@@ -127,8 +135,7 @@ func New(ctx context.Context, project, bucket, object string) (sync.Locker, erro
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	scope := "https://www.googleapis.com/auth/devstorage.full_control"
-	client, err := google.DefaultClient(ctx, scope)
+	client, err := httpClient(ctx)
 	if err != nil {
 		return nil, err
 	}
