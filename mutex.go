@@ -78,6 +78,7 @@ type mutex struct {
 	bucket  string
 	object  string
 	client  *http.Client
+	context context.Context
 }
 
 // Lock waits indefinitely to acquire a global mutex lock.
@@ -96,7 +97,12 @@ func (m *mutex) Lock() {
 				return
 			}
 		}
-		time.Sleep(time.Duration(i) * time.Millisecond)
+		select {
+		case <-time.After(time.Duration(i) * time.Millisecond):
+			continue
+		case <-m.context.Done():
+			return
+		}
 	}
 }
 
@@ -144,6 +150,7 @@ func New(ctx context.Context, project, bucket, object string) (sync.Locker, erro
 		bucket:  bucket,
 		object:  object,
 		client:  client,
+		context: ctx,
 	}
 	return m, nil
 }
