@@ -44,12 +44,21 @@ var (
 // Lock waits up to duration d for l.Lock() to succeed.
 func Lock(l sync.Locker, d time.Duration) error {
 	done := make(chan struct{}, 1)
-	ctx, cancel := context.WithTimeout(context.Background(), d*time.Second)
-	defer cancel()
-	go func(context.Context) {
-		l.Lock()
-		done <- struct{}{}
-	}(ctx)
+	m, ok := l.(*mutex)
+	// if l is a mutex, lock with a timeout context.
+	if ok {
+		ctx, cancel := context.WithTimeout(context.Background(), d*time.Second)
+		defer cancel()
+		go func(context.Context) {
+			m.lock(ctx)
+			done <- struct{}{}
+		}(ctx)
+	} else {
+		go func() {
+			l.Lock()
+			done <- struct{}{}
+		}()
+	}
 	select {
 	case <-done:
 		return nil
@@ -78,11 +87,17 @@ type mutex struct {
 	bucket  string
 	object  string
 	client  *http.Client
-	context context.Context
 }
 
-// Lock waits indefinitely to acquire a global mutex lock.
+// Lock waits indefinitely to acquire a global mutex.
 func (m *mutex) Lock() {
+	ctx := context.Background()
+	m.lock(ctx)
+}
+
+// Private method that waits indefinitely to acquire a global mutex
+// with aggregate timeout governed by passed context.
+func (m *mutex) lock(ctx context.Context) {
 	q := url.Values{
 		"name":              {m.object},
 		"uploadType":        {"media"},
@@ -100,7 +115,7 @@ func (m *mutex) Lock() {
 		select {
 		case <-time.After(time.Duration(i) * time.Millisecond):
 			continue
-		case <-m.context.Done():
+		case <-ctx.Done():
 			return
 		}
 	}
@@ -150,7 +165,6 @@ func New(ctx context.Context, project, bucket, object string) (sync.Locker, erro
 		bucket:  bucket,
 		object:  object,
 		client:  client,
-		context: ctx,
 	}
 	return m, nil
 }
