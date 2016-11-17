@@ -45,14 +45,15 @@ var (
 func Lock(l sync.Locker, d time.Duration) error {
 	done := make(chan struct{}, 1)
 	m, ok := l.(*mutex)
+	var err error = nil
 	// if l is a mutex, lock with a timeout context.
 	if ok {
-		ctx, cancel := context.WithTimeout(context.Background(), d*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), d)
 		defer cancel()
-		go func(context.Context) {
-			m.lock(ctx)
+		go func() {
+			err = m.lock(ctx)
 			done <- struct{}{}
-		}(ctx)
+		}()
 	} else {
 		go func() {
 			l.Lock()
@@ -61,7 +62,7 @@ func Lock(l sync.Locker, d time.Duration) error {
 	}
 	select {
 	case <-done:
-		return nil
+		return err
 	case <-time.After(d):
 		return errors.New("lock request timed out")
 	}
@@ -70,13 +71,25 @@ func Lock(l sync.Locker, d time.Duration) error {
 // Unlock waits up to duration d for l.Unlock() to succeed.
 func Unlock(l sync.Locker, d time.Duration) error {
 	done := make(chan struct{}, 1)
-	go func() {
-		l.Unlock()
-		done <- struct{}{}
-	}()
+	m, ok := l.(*mutex)
+	var err error = nil
+	// if l is a mutex, unlock with a timeout context.
+	if ok {
+		ctx, cancel := context.WithTimeout(context.Background(), d)
+		defer cancel()
+		go func() {
+			err = m.unlock(ctx)
+			done <- struct{}{}
+		}()
+	} else {
+		go func() {
+			l.Unlock()
+			done <- struct{}{}
+		}()
+	}
 	select {
 	case <-done:
-		return nil
+		return err
 	case <-time.After(d):
 		return errors.New("unlock request timed out")
 	}
@@ -89,15 +102,14 @@ type mutex struct {
 	client  *http.Client
 }
 
-// Lock waits indefinitely to acquire a global mutex.
+// Lock waits indefinitely to acquire a mutex.
 func (m *mutex) Lock() {
-	ctx := context.Background()
-	m.lock(ctx)
+	m.lock(context.Background())
 }
 
-// Private method that waits indefinitely to acquire a global mutex
+// Private method that waits indefinitely to acquire a mutex
 // with aggregate timeout governed by passed context.
-func (m *mutex) lock(ctx context.Context) {
+func (m *mutex) lock(ctx context.Context) error {
 	q := url.Values{
 		"name":              {m.object},
 		"uploadType":        {"media"},
@@ -109,20 +121,26 @@ func (m *mutex) lock(ctx context.Context) {
 		if err == nil {
 			res.Body.Close()
 			if res.StatusCode == 200 {
-				return
+				return nil
 			}
 		}
 		select {
 		case <-time.After(time.Duration(i) * time.Millisecond):
 			continue
 		case <-ctx.Done():
-			return
+			return errors.New("lock request timed out")
 		}
 	}
 }
 
-// Unlock waits indefinitely to relinquish a global mutex lock.
+// Unlock waits indefinitely to release a mutex.
 func (m *mutex) Unlock() {
+	m.unlock(context.Background())
+}
+
+// Private method that waits indefinitely to release a mutex
+// with aggregate timeout governed by passed context.
+func (m *mutex) unlock(ctx context.Context) error {
 	url := fmt.Sprintf("%s/b/%s/o/%s?", storageUnlockURL, m.bucket, m.object)
 	for i := 1; ; i *= 2 {
 		req, err := http.NewRequest("DELETE", url, nil)
@@ -131,11 +149,16 @@ func (m *mutex) Unlock() {
 			if err == nil {
 				res.Body.Close()
 				if res.StatusCode == 204 {
-					return
+					return nil
 				}
 			}
 		}
-		time.Sleep(time.Duration(i) * time.Millisecond)
+		select {
+		case <-time.After(time.Duration(i) * time.Millisecond):
+			continue
+		case <-ctx.Done():
+			return errors.New("unlock request timed out")
+		}
 	}
 }
 
