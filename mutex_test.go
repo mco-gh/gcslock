@@ -15,6 +15,7 @@
 package gcslock
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -175,34 +176,51 @@ func TestUnlockRetry(t *testing.T) {
 	}
 }
 
-// This type is used to mock the sync.Lock interface.
-type mockLocker struct {
+type mockContextLocker struct {
+	mutex
 	wait time.Duration
 }
 
-func (l *mockLocker) Lock() {
+func (l *mockContextLocker) Lock() {
 	time.Sleep(l.wait)
 }
-func (l *mockLocker) Unlock() {
+
+func (l *mockContextLocker) Unlock() {
 	time.Sleep(l.wait)
 }
 
 func TestLockTimeout(t *testing.T) {
-	m := &mockLocker{10 * time.Millisecond}
-	if err := Lock(m, time.Millisecond); err == nil {
-		t.Errorf("want lock error for Lock(m, 1ms)")
+	mut, err := New(nil, "stub", "gcslock", "lock")
+	if err != nil {
+		t.Fatal("unable to allocate a gcslock.mutex object")
 	}
-	if err := Lock(m, 100*time.Millisecond); err != nil {
-		t.Errorf("Lock(m, 100ms): %v", err)
+	m := &mockContextLocker{*mut, 10 * time.Millisecond}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond)
+	defer cancel()
+	if err := m.ContextLock(ctx); err == nil {
+		t.Errorf("want lock timeout for ContextLock w/ 1ms timeout")
+	}
+	ctx, cancel = context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+	if err = m.ContextLock(ctx); err != nil {
+		t.Errorf("ContextLock w/ 100ms timeout: %v", err)
 	}
 }
 
 func TestUnlockTimeout(t *testing.T) {
-	m := &mockLocker{10 * time.Millisecond}
-	if err := Unlock(m, time.Millisecond); err == nil {
-		t.Errorf("want unlock error for Unlock(m, 1ms)")
+	mut, err := New(nil, "stub", "gcslock", "lock")
+	if err != nil {
+		t.Fatal("unable to allocate a gcslock.mutex object")
 	}
-	if err := Unlock(m, 100*time.Millisecond); err != nil {
-		t.Errorf("Unlock(m, 100ms): %v", err)
+	m := &mockContextLocker{*mut, 10 * time.Millisecond}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond)
+	defer cancel()
+	if err := m.ContextUnlock(ctx); err == nil {
+		t.Errorf("want unlock timeout for ContextUnlock w/ 1ms timeout")
+	}
+	ctx, cancel = context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+	if err = m.ContextUnlock(ctx); err != nil {
+		t.Errorf("ContextUnlock w/ 100ms timeout: %v", err)
 	}
 }

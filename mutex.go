@@ -41,58 +41,11 @@ var (
 	storageUnlockURL = defaultStorageUnlockURL
 )
 
-// Lock waits up to duration d for l.Lock() to succeed.
-func Lock(l sync.Locker, d time.Duration) error {
-	done := make(chan struct{}, 1)
-	m, ok := l.(*mutex)
-	var err error = nil
-	// if l is a mutex, lock with a timeout context.
-	if ok {
-		ctx, cancel := context.WithTimeout(context.Background(), d)
-		defer cancel()
-		go func() {
-			err = m.lock(ctx)
-			done <- struct{}{}
-		}()
-	} else {
-		go func() {
-			l.Lock()
-			done <- struct{}{}
-		}()
-	}
-	select {
-	case <-done:
-		return err
-	case <-time.After(d):
-		return errors.New("lock request timed out")
-	}
-}
-
-// Unlock waits up to duration d for l.Unlock() to succeed.
-func Unlock(l sync.Locker, d time.Duration) error {
-	done := make(chan struct{}, 1)
-	m, ok := l.(*mutex)
-	var err error = nil
-	// if l is a mutex, unlock with a timeout context.
-	if ok {
-		ctx, cancel := context.WithTimeout(context.Background(), d)
-		defer cancel()
-		go func() {
-			err = m.unlock(ctx)
-			done <- struct{}{}
-		}()
-	} else {
-		go func() {
-			l.Unlock()
-			done <- struct{}{}
-		}()
-	}
-	select {
-	case <-done:
-		return err
-	case <-time.After(d):
-		return errors.New("unlock request timed out")
-	}
+// ContextLocker provides an extension of the sync.Locker interface.
+type ContextLocker interface {
+	sync.Locker
+	ContextLock(context.Context)
+	ContextUnlock(context.Context)
 }
 
 type mutex struct {
@@ -104,12 +57,12 @@ type mutex struct {
 
 // Lock waits indefinitely to acquire a mutex.
 func (m *mutex) Lock() {
-	m.lock(context.Background())
+	m.ContextLock(context.Background())
 }
 
-// Private method that waits indefinitely to acquire a mutex
-// with aggregate timeout governed by passed context.
-func (m *mutex) lock(ctx context.Context) error {
+// ContextLock waits indefinitely to acquire a mutex with timeout
+// governed by passed context.
+func (m *mutex) ContextLock(ctx context.Context) error {
 	q := url.Values{
 		"name":              {m.object},
 		"uploadType":        {"media"},
@@ -135,12 +88,12 @@ func (m *mutex) lock(ctx context.Context) error {
 
 // Unlock waits indefinitely to release a mutex.
 func (m *mutex) Unlock() {
-	m.unlock(context.Background())
+	m.ContextUnlock(context.Background())
 }
 
-// Private method that waits indefinitely to release a mutex
-// with aggregate timeout governed by passed context.
-func (m *mutex) unlock(ctx context.Context) error {
+// ContextUnlock waits indefinitely to release a mutex with timeout
+// governed by passed context.
+func (m *mutex) ContextUnlock(ctx context.Context) error {
 	url := fmt.Sprintf("%s/b/%s/o/%s?", storageUnlockURL, m.bucket, m.object)
 	for i := 1; ; i *= 2 {
 		req, err := http.NewRequest("DELETE", url, nil)
@@ -175,7 +128,7 @@ var httpClient = func(ctx context.Context) (*http.Client, error) {
 //
 // If ctx argument is nil, context.Background is used.
 //
-func New(ctx context.Context, project, bucket, object string) (sync.Locker, error) {
+func New(ctx context.Context, project, bucket, object string) (*mutex, error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
