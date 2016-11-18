@@ -15,7 +15,6 @@
 package gcslock
 
 import (
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
