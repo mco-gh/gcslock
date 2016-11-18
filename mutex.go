@@ -18,7 +18,6 @@ package gcslock
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -49,10 +48,9 @@ type ContextLocker interface {
 }
 
 type mutex struct {
-	project string
-	bucket  string
-	object  string
-	client  *http.Client
+	bucket string
+	object string
+	client *http.Client
 }
 
 // Lock waits indefinitely to acquire a mutex.
@@ -81,7 +79,7 @@ func (m *mutex) ContextLock(ctx context.Context) error {
 		case <-time.After(time.Duration(i) * time.Millisecond):
 			continue
 		case <-ctx.Done():
-			return errors.New("lock request timed out")
+			return ctx.Err()
 		}
 	}
 }
@@ -110,7 +108,7 @@ func (m *mutex) ContextUnlock(ctx context.Context) error {
 		case <-time.After(time.Duration(i) * time.Millisecond):
 			continue
 		case <-ctx.Done():
-			return errors.New("unlock request timed out")
+			return ctx.Err()
 		}
 	}
 }
@@ -128,7 +126,7 @@ var httpClient = func(ctx context.Context) (*http.Client, error) {
 //
 // If ctx argument is nil, context.Background is used.
 //
-func New(ctx context.Context, project, bucket, object string) (*mutex, error) {
+func New(ctx context.Context, bucket, object string) (*mutex, error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -137,10 +135,9 @@ func New(ctx context.Context, project, bucket, object string) (*mutex, error) {
 		return nil, err
 	}
 	m := &mutex{
-		project: project,
-		bucket:  bucket,
-		object:  object,
-		client:  client,
+		bucket: bucket,
+		object: object,
+		client: client,
 	}
 	return m, nil
 }

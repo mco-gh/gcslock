@@ -54,7 +54,7 @@ func TestLock(t *testing.T) {
 	}))
 	defer storage.Close()
 	storageLockURL = storage.URL
-	m, err := New(nil, "stub", "gcslock", "lock")
+	m, err := New(nil, "gcslock", "lock")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -86,7 +86,7 @@ func TestLockRetry(t *testing.T) {
 	defer storage.Close()
 	storageLockURL = storage.URL
 
-	m, err := New(nil, "stub", "gcslock", "lock")
+	m, err := New(nil, "gcslock", "lock")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -121,7 +121,7 @@ func TestUnlock(t *testing.T) {
 	defer storage.Close()
 	storageUnlockURL = storage.URL
 
-	m, err := New(nil, "stub", "gcslock", "lock")
+	m, err := New(nil, "gcslock", "lock")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -155,7 +155,7 @@ func TestUnlockRetry(t *testing.T) {
 	defer storage.Close()
 	storageUnlockURL = storage.URL
 
-	m, err := New(nil, "stub", "gcslock", "lock")
+	m, err := New(nil, "gcslock", "lock")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -189,7 +189,7 @@ func (l *mockContextLocker) Unlock() {
 }
 
 func TestLockTimeout(t *testing.T) {
-	mut, err := New(nil, "stub", "gcslock", "lock")
+	mut, err := New(nil, "gcslock", "lock")
 	if err != nil {
 		t.Fatal("unable to allocate a gcslock.mutex object")
 	}
@@ -207,7 +207,7 @@ func TestLockTimeout(t *testing.T) {
 }
 
 func TestUnlockTimeout(t *testing.T) {
-	mut, err := New(nil, "stub", "gcslock", "lock")
+	mut, err := New(nil, "gcslock", "lock")
 	if err != nil {
 		t.Fatal("unable to allocate a gcslock.mutex object")
 	}
