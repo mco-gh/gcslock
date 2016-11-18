@@ -95,7 +95,7 @@ The godoc document can be found [here](https://godoc.org/github.com/marcacohen/g
 1. In your Go code, import `github.com/marcacohen/gcslock` and use it as follows:
 
 ```go
-m, err := gcslock.New(nil, project, bucket, object)
+m, err := gcslock.New(nil, bucket, object)
 if err != nil {
   log.Fatal(err)
 }
@@ -119,7 +119,7 @@ use of locking/unlocking with a timeout context:
 
 ```go
 // Instantiate mutex and setup a context with 100ms timeout.
-m, err := gcslock.New(nil, project, bucket, object)
+m, err := gcslock.New(nil, bucket, object)
 if err != nil {
   log.Fatal(err)
 }
