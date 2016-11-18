@@ -211,7 +211,6 @@ func TestLockShouldNotTimeout(t *testing.T) {
 func TestUnlockShouldTimeout(t *testing.T) {
 	// Google cloud storage stub that takes 10ms to respond.
 	storage := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Printf("hi marc\n")
 		time.Sleep(10 * time.Millisecond)
 		w.WriteHeader(http.StatusNoContent)
 	}))
