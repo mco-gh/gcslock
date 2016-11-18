@@ -61,6 +61,7 @@ func (m *mutex) Lock() {
 // ContextLock waits indefinitely to acquire a mutex with timeout
 // governed by passed context.
 func (m *mutex) ContextLock(ctx context.Context) error {
+	okToReturn := false
 	q := url.Values{
 		"name":              {m.object},
 		"uploadType":        {"media"},
@@ -72,11 +73,15 @@ func (m *mutex) ContextLock(ctx context.Context) error {
 		if err == nil {
 			res.Body.Close()
 			if res.StatusCode == 200 {
-				return nil
+				// Check for timeout before returning.
+				okToReturn = true
 			}
 		}
 		select {
 		case <-time.After(time.Duration(i) * time.Millisecond):
+			if okToReturn {
+				return nil
+			}
 			continue
 		case <-ctx.Done():
 			return ctx.Err()
@@ -92,6 +97,7 @@ func (m *mutex) Unlock() {
 // ContextUnlock waits indefinitely to release a mutex with timeout
 // governed by passed context.
 func (m *mutex) ContextUnlock(ctx context.Context) error {
+	okToReturn := false
 	url := fmt.Sprintf("%s/b/%s/o/%s?", storageUnlockURL, m.bucket, m.object)
 	for i := 1; ; i *= 2 {
 		req, err := http.NewRequest("DELETE", url, nil)
@@ -100,12 +106,16 @@ func (m *mutex) ContextUnlock(ctx context.Context) error {
 			if err == nil {
 				res.Body.Close()
 				if res.StatusCode == 204 {
-					return nil
+					// Check for timeout before returning.
+					okToReturn = true
 				}
 			}
 		}
 		select {
 		case <-time.After(time.Duration(i) * time.Millisecond):
+			if okToReturn {
+				return nil
+			}
 			continue
 		case <-ctx.Done():
 			return ctx.Err()

@@ -15,19 +15,16 @@
 package gcslock
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"reflect"
-	"sync"
 	"testing"
 	"time"
 
 	"golang.org/x/net/context"
 )
-
-// make sure mutex pointer satisfies sync.Locker
-var _ sync.Locker = &mutex{}
 
 func init() {
 	httpClient = func(context.Context) (*http.Client, error) { return http.DefaultClient, nil }
@@ -175,51 +172,78 @@ func TestUnlockRetry(t *testing.T) {
 	}
 }
 
-type mockContextLocker struct {
-	mutex
-	wait time.Duration
-}
-
-func (l *mockContextLocker) Lock() {
-	time.Sleep(l.wait)
-}
-
-func (l *mockContextLocker) Unlock() {
-	time.Sleep(l.wait)
-}
-
-func TestLockTimeout(t *testing.T) {
-	mut, err := New(nil, "gcslock", "lock")
+func TestLockShouldTimeout(t *testing.T) {
+	// Google cloud storage stub that takes 10ms to respond.
+	storage := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(10 * time.Millisecond)
+	}))
+	defer storage.Close()
+	storageLockURL = storage.URL
+	m, err := New(nil, "gcslock", "lock")
 	if err != nil {
 		t.Fatal("unable to allocate a gcslock.mutex object")
 	}
-	m := &mockContextLocker{*mut, 10 * time.Millisecond}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond)
 	defer cancel()
 	if err := m.ContextLock(ctx); err == nil {
-		t.Errorf("want lock timeout for ContextLock w/ 1ms timeout")
-	}
-	ctx, cancel = context.WithTimeout(context.Background(), 100*time.Millisecond)
-	defer cancel()
-	if err = m.ContextLock(ctx); err != nil {
-		t.Errorf("ContextLock w/ 100ms timeout: %v", err)
+		t.Errorf("ContextLock w/ 1ms limit should have timed out")
 	}
 }
 
-func TestUnlockTimeout(t *testing.T) {
-	mut, err := New(nil, "gcslock", "lock")
+func TestLockShouldNotTimeout(t *testing.T) {
+	// Google cloud storage stub that takes 10ms to respond.
+	storage := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(10 * time.Millisecond)
+	}))
+	defer storage.Close()
+	storageLockURL = storage.URL
+	m, err := New(nil, "gcslock", "lock")
 	if err != nil {
 		t.Fatal("unable to allocate a gcslock.mutex object")
 	}
-	m := &mockContextLocker{*mut, 10 * time.Millisecond}
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+	if err = m.ContextLock(ctx); err != nil {
+		t.Errorf("ContextLock w/ 100ms limit shouldn't have timed out: %v", err)
+	}
+}
+
+func TestUnlockShouldTimeout(t *testing.T) {
+	// Google cloud storage stub that takes 10ms to respond.
+	storage := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Printf("hi marc\n")
+		time.Sleep(10 * time.Millisecond)
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer storage.Close()
+	storageUnlockURL = storage.URL
+	m, err := New(nil, "gcslock", "lock")
+	if err != nil {
+		t.Fatal("unable to allocate a gcslock.mutex object")
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond)
 	defer cancel()
 	if err := m.ContextUnlock(ctx); err == nil {
-		t.Errorf("want unlock timeout for ContextUnlock w/ 1ms timeout")
+		t.Errorf("ContextUnlock w/ 1ms limit should have timed out")
 	}
-	ctx, cancel = context.WithTimeout(context.Background(), 100*time.Millisecond)
+}
+
+func TestUnlockShouldNotTimeout(t *testing.T) {
+	// Google cloud storage stub that takes 10ms to respond.
+	storage := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(10 * time.Millisecond)
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer storage.Close()
+	storageUnlockURL = storage.URL
+	m, err := New(nil, "gcslock", "lock")
+	if err != nil {
+		t.Fatal("unable to allocate a gcslock.mutex object")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
 	if err = m.ContextUnlock(ctx); err != nil {
-		t.Errorf("ContextUnlock w/ 100ms timeout: %v", err)
+		t.Errorf("ContextUnlock w/ 100ms limit shouldn't have timed out: %v", err)
 	}
+	m.Unlock()
 }
