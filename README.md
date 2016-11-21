@@ -95,7 +95,7 @@ The godoc document can be found [here](https://godoc.org/github.com/marcacohen/g
 1. In your Go code, import `github.com/marcacohen/gcslock` and use it as follows:
 
 ```go
-m, err := gcslock.New(nil, project, bucket, object)
+m, err := gcslock.New(nil, bucket, object)
 if err != nil {
   log.Fatal(err)
 }
@@ -110,22 +110,32 @@ The Lock() and Unlock() methods implemented by this package follow the same
 semantics as the standard [sync.Locker interface](https://golang.org/pkg/sync/#Locker):
 they block indefinitely waiting to acquire or relinquish a lock. But sometimes
 you can't afford to wait forever for something to happen. Of course, you can
-implement your own timeout logic but to make life easier for clients, this
-library offers a built-in version of Lock() and Unlock() package level functions
-which accept a timeout value, expressed as a `time.duration`. Here's an example
-use of each:
+implement your own timeout logic but to make life easier for clients, the mutex
+object also offers the ContextLock() and ContextUnlock() methods, which accept
+a context with an optional preset timeout value. If the context does not have
+an associated timeout then these calls are equivalent to the Lock/Unlock methods
+(i.e. they wait indefinitely to acquire/release the mutex). Here's an example 
+use of locking/unlocking with a timeout context:
 
 ```go
-// Wait up to 100ms to acquire a lock.
-if err := gcslock.Lock(m, 100*time.Millisecond); err != nil {
+// Instantiate mutex and setup a context with 100ms timeout.
+m, err := gcslock.New(nil, bucket, object)
+if err != nil {
   log.Fatal(err)
 }
+ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+defer cancel()
 
-// Do something interesting (and protected) here.
+// Wait up to 100ms to acquire a lock.
+if err = m.ContextLock(ctx); err != nil {
+	return err
+}
 
-// Wait up to 100ms to relinquish a lock.
-if err := gcslock.Unlock(m, 100*time.Millisecond); err != nil {
-  log.Fatal(err)
+// Do protected work here.
+
+// Wait up to 100ms to relinquish the lock.
+if err = m.ContextUnlock(ctx); err != nil {
+	return err
 }
 ```
 

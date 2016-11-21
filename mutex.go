@@ -18,7 +18,6 @@ package gcslock
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -41,79 +40,103 @@ var (
 	storageUnlockURL = defaultStorageUnlockURL
 )
 
-// Lock waits up to duration d for l.Lock() to succeed.
-func Lock(l sync.Locker, d time.Duration) error {
-	done := make(chan struct{}, 1)
-	go func() {
-		l.Lock()
-		done <- struct{}{}
-	}()
-	select {
-	case <-done:
-		return nil
-	case <-time.After(d):
-		return errors.New("lock request timed out")
-	}
-}
-
-// Unlock waits up to duration d for l.Unlock() to succeed.
-func Unlock(l sync.Locker, d time.Duration) error {
-	done := make(chan struct{}, 1)
-	go func() {
-		l.Unlock()
-		done <- struct{}{}
-	}()
-	select {
-	case <-done:
-		return nil
-	case <-time.After(d):
-		return errors.New("unlock request timed out")
-	}
+// ContextLocker provides an extension of the sync.Locker interface.
+type ContextLocker interface {
+	sync.Locker
+	ContextLock(context.Context) error
+	ContextUnlock(context.Context) error
 }
 
 type mutex struct {
-	project string
-	bucket  string
-	object  string
-	client  *http.Client
+	bucket string
+	object string
+	client *http.Client
 }
 
-// Lock waits indefinitely to acquire a global mutex lock.
+var _ ContextLocker = (*mutex)(nil)
+
+// Lock waits indefinitely to acquire a mutex.
 func (m *mutex) Lock() {
+	m.ContextLock(context.Background())
+}
+
+// ContextLock waits indefinitely to acquire a mutex with timeout
+// governed by passed context.
+func (m *mutex) ContextLock(ctx context.Context) error {
 	q := url.Values{
 		"name":              {m.object},
 		"uploadType":        {"media"},
 		"ifGenerationMatch": {"0"},
 	}
 	url := fmt.Sprintf("%s/b/%s/o?%s", storageLockURL, m.bucket, q.Encode())
-	for i := 1; ; i *= 2 {
-		res, err := m.client.Post(url, "plain/text", bytes.NewReader([]byte("1")))
+	// NOTE: ctx deadline/timeout and backoff are independent. The former is
+	// an aggregate timeout and the latter is a per loop iteration delay.
+	backoff := 10 * time.Millisecond
+	for {
+		req, err := http.NewRequest("POST", url, bytes.NewReader([]byte("1")))
+		if err != nil {
+			// Likely malformed URL - retry won't fix so return.
+			return err
+		}
+		req.Header.Set("content-type", "text/plain")
+		req = req.WithContext(ctx)
+		res, err := m.client.Do(req)
 		if err == nil {
 			res.Body.Close()
 			if res.StatusCode == 200 {
-				return
+				return nil
 			}
 		}
-		time.Sleep(time.Duration(i) * time.Millisecond)
+		select {
+		case <-time.After(backoff):
+			backoff *= 2
+			continue
+		case <-ctx.Done():
+			return ctx.Err()
+		}
 	}
 }
 
-// Unlock waits indefinitely to relinquish a global mutex lock.
+// Unlock waits indefinitely to release a mutex.
 func (m *mutex) Unlock() {
+	m.ContextUnlock(context.Background())
+}
+
+// ContextUnlock waits indefinitely to release a mutex with timeout
+// governed by passed context.
+func (m *mutex) ContextUnlock(ctx context.Context) error {
 	url := fmt.Sprintf("%s/b/%s/o/%s?", storageUnlockURL, m.bucket, m.object)
-	for i := 1; ; i *= 2 {
+	// NOTE: ctx deadline/timeout and backoff are independent. The former is
+	// an aggregate timeout and the latter is a per loop iteration delay.
+	backoff := 10 * time.Millisecond
+	for {
 		req, err := http.NewRequest("DELETE", url, nil)
+		if err != nil {
+			// Likely malformed URL - retry won't fix so return.
+			return err
+		}
+		req = req.WithContext(ctx)
+		res, err := m.client.Do(req)
 		if err == nil {
-			res, err := m.client.Do(req)
-			if err == nil {
-				res.Body.Close()
-				if res.StatusCode == 204 {
-					return
-				}
+			res.Body.Close()
+			if res.StatusCode == 204 {
+				return nil
 			}
 		}
-		time.Sleep(time.Duration(i) * time.Millisecond)
+		select {
+		case <-time.After(backoff):
+			backoff *= 2
+			continue
+		case <-ctx.Done():
+			return ctx.Err()
+		}
 	}
+}
+
+// httpClient is overwritten in tests
+var httpClient = func(ctx context.Context) (*http.Client, error) {
+	const scope = "https://www.googleapis.com/auth/devstorage.full_control"
+	return google.DefaultClient(ctx, scope)
 }
 
 // New creates a GCS-based sync.Locker.
@@ -123,20 +146,18 @@ func (m *mutex) Unlock() {
 //
 // If ctx argument is nil, context.Background is used.
 //
-func New(ctx context.Context, project, bucket, object string) (sync.Locker, error) {
+func New(ctx context.Context, bucket, object string) (ContextLocker, error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	scope := "https://www.googleapis.com/auth/devstorage.full_control"
-	client, err := google.DefaultClient(ctx, scope)
+	client, err := httpClient(ctx)
 	if err != nil {
 		return nil, err
 	}
 	m := &mutex{
-		project: project,
-		bucket:  bucket,
-		object:  object,
-		client:  client,
+		bucket: bucket,
+		object: object,
+		client: client,
 	}
 	return m, nil
 }
