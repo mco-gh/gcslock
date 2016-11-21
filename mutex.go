@@ -115,7 +115,6 @@ func (m *mutex) ContextUnlock(ctx context.Context) error {
 			// Likely malformed URL - retry won't fix so return.
 			return err
 		}
-		req.Header.Set("content-type", "text/plain")
 		req = req.WithContext(ctx)
 		res, err := m.client.Do(req)
 		if err == nil {
