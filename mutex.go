@@ -69,30 +69,30 @@ func (m *mutex) ContextLock(ctx context.Context) error {
 		"ifGenerationMatch": {"0"},
 	}
 	url := fmt.Sprintf("%s/b/%s/o?%s", storageLockURL, m.bucket, q.Encode())
-	// Starting w/ 10ms, backoff and retry exponentially.
-	for i := 10; ; i *= 2 {
-		done := make(chan bool)
-		go func() {
-			res, err := m.client.Post(url, "plain/text", bytes.NewReader([]byte("1")))
-			if err == nil {
-				res.Body.Close()
-				if res.StatusCode == 200 {
-					done <- true
-					return
-				}
+	// NOTE: ctx deadline/timeout and backoff are independent. The former is
+	// an aggregate timeout and the latter is a per loop iteration delay.
+	backoff := 10 * time.Millisecond
+	for {
+		req, err := http.NewRequest("POST", url, bytes.NewReader([]byte("1")))
+		if err != nil {
+			// Likely malformed URL - retry won't fix so return.
+			return err
+		}
+		req.Header.Set("content-type", "text/plain")
+		req = req.WithContext(ctx)
+		res, err := m.client.Do(req)
+		if err == nil {
+			res.Body.Close()
+			if res.StatusCode == 200 {
+				return nil
 			}
-			done <- false
-		}()
+		}
 		select {
-		case <-time.After(time.Duration(i) * time.Millisecond):
+		case <-time.After(backoff):
+			backoff *= 2
 			continue
 		case <-ctx.Done():
 			return ctx.Err()
-		case d := <-done:
-			if d {
-				return nil
-			}
-			continue
 		}
 	}
 }
@@ -106,33 +106,30 @@ func (m *mutex) Unlock() {
 // governed by passed context.
 func (m *mutex) ContextUnlock(ctx context.Context) error {
 	url := fmt.Sprintf("%s/b/%s/o/%s?", storageUnlockURL, m.bucket, m.object)
-	// Starting w/ 10ms, backoff and retry exponentially.
-	for i := 10; ; i *= 2 {
-		done := make(chan bool)
-		go func() {
-			req, err := http.NewRequest("DELETE", url, nil)
-			if err == nil {
-				res, err := m.client.Do(req)
-				if err == nil {
-					res.Body.Close()
-					if res.StatusCode == 204 {
-						done <- true
-						return
-					}
-				}
+	// NOTE: ctx deadline/timeout and backoff are independent. The former is
+	// an aggregate timeout and the latter is a per loop iteration delay.
+	backoff := 10 * time.Millisecond
+	for {
+		req, err := http.NewRequest("DELETE", url, nil)
+		if err != nil {
+			// Likely malformed URL - retry won't fix so return.
+			return err
+		}
+		req.Header.Set("content-type", "text/plain")
+		req = req.WithContext(ctx)
+		res, err := m.client.Do(req)
+		if err == nil {
+			res.Body.Close()
+			if res.StatusCode == 204 {
+				return nil
 			}
-			done <- false
-		}()
+		}
 		select {
-		case <-time.After(time.Duration(i) * time.Millisecond):
+		case <-time.After(backoff):
+			backoff *= 2
 			continue
 		case <-ctx.Done():
 			return ctx.Err()
-		case d := <-done:
-			if d {
-				return nil
-			}
-			continue
 		}
 	}
 }
