@@ -8,8 +8,8 @@ for Google but this is not an official Google product.)
 
 ## Open this repo in Google Cloud Shell
 
-[![Open in Cloud Shell](https://path-to-open-in-cloud-shell.png)]
-(https://console.cloud.google.com/cloudshell/open?git_repo=https://github.com/marcacohen/gcslock&page=shell)
+<a href="https://console.cloud.google.com/cloudshell/open?git_repo=https://github.com/marcacohen/gcslock&page=shell">
+<img alt="Open in Cloud Shell" src ="http://gstatic.com/cloudssh/images/open-btn.png"></a>
 
 ## What is this?
 
