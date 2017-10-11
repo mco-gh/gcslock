@@ -6,6 +6,11 @@
 computations anywhere on the global internet. (Disclaimer: The author works
 for Google but this is not an official Google product.)
 
+## Open this repo in Google Cloud Shell
+
+[![Open in Cloud Shell](https://path-to-open-in-cloud-shell.png)]
+(https://console.cloud.google.com/cloudshell/open?git_repo=https://github.com/marcacohen/gcslock&page=shell)
+
 ## What is this?
 
 Once upon a time, in CS grad school, I was given an interesting homework
