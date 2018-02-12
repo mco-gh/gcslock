@@ -173,10 +173,10 @@ and dies before relinquishing it, the entire mutex is deadlocked. In a closed
 system in which you are trying to find and debug problems, this can sometimes
 be the desired behavior, but for most applications this is a serious problem.
 There are two ways around this issue:
-  * Implement a lock watcher which periodically checks the lock age and deletes
+    * Implement a lock watcher which periodically checks the lock age and deletes
 any lock object older than a configurable threshold. Unfortunately, now you have
 a new problem: what happens if the lock watcher dies?
-  * Ideally the underlying storage mechanism would provide a way to automatically
+    * Ideally the underlying storage mechanism would provide a way to automatically
 delete any lock object older than a configurable interval. **Good news**: Google
 Cloud Storage implements just such a feature called
 [Life Cycle Management](https://cloud.google.com/storage/docs/lifecycle).
