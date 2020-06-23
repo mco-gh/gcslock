@@ -245,3 +245,35 @@ func TestUnlockShouldNotTimeout(t *testing.T) {
 	}
 	m.Unlock()
 }
+
+func TestUnlockURLEncoding(t *testing.T) {
+	// google cloud storage stub
+	storage := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "DELETE" {
+			t.Errorf("r.Method = %q; want DELETE", r.Method)
+		}
+		path := "/b/gcslock/o/folder%2Flock"
+		if r.URL.RawPath != path {
+			t.Errorf("r.URL.Path = %q; want %q", r.URL.Path, path)
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer storage.Close()
+	storageUnlockURL = storage.URL
+
+	m, err := New(nil, "gcslock", "folder/lock")
+	if err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan struct{})
+	go func() {
+		m.Unlock()
+		close(done)
+	}()
+	select {
+	case <-time.After(time.Second):
+		t.Errorf("m.Unlock() took too long to unlock")
+	case <-done:
+		// pass
+	}
+}

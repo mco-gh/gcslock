@@ -105,7 +105,7 @@ func (m *mutex) Unlock() {
 // ContextUnlock waits indefinitely to release a mutex with timeout
 // governed by passed context.
 func (m *mutex) ContextUnlock(ctx context.Context) error {
-	url := fmt.Sprintf("%s/b/%s/o/%s?", storageUnlockURL, m.bucket, m.object)
+	url := fmt.Sprintf("%s/b/%s/o/%s?", storageUnlockURL, m.bucket, url.PathEscape(m.object))
 	// NOTE: ctx deadline/timeout and backoff are independent. The former is
 	// an aggregate timeout and the latter is a per loop iteration delay.
 	backoff := 10 * time.Millisecond
